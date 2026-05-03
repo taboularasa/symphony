@@ -28,6 +28,7 @@ jobs:
         run: |
           if [ -f go.mod ]; then
             go test ./...
+            go vet ./...
           else
             echo "No go.mod yet; skipping Go tests."
           fi
