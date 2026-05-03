@@ -1,0 +1,29 @@
+forbidden_for:
+  - project: "Symphony"
+    actors: ["hermes"]
+  - project: "De Novo"
+    actors: ["hermes"]
+
+actors:
+  - key: "hermes"
+    linear_user_ids: ["replace-with-hermes-linear-user-id"]
+    emails: ["hermes-bot@hadto.net"]
+  - key: "denovo"
+    linear_user_ids: ["replace-with-denovo-linear-user-id"]
+    emails: ["denovo-bot@hadto.net"]
+  - key: "watcher"
+    linear_user_ids: ["replace-with-watcher-linear-user-id"]
+    emails: ["watcher-bot@hadto.net"]
+
+watcher_actor: "watcher"
+
+rate_limits:
+  actor_writes_per_minute: 30
+
+alerts:
+  slack_channel_id: "CAGENTSBRIDGE"
+  human_mention: "@david"
+
+webhook:
+  signing_secret_env: "LINEAR_WEBHOOK_SECRET"
+  timestamp_tolerance_seconds: 60
