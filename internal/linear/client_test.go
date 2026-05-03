@@ -72,6 +72,30 @@ func TestClientDoReturnsGraphQLErrors(t *testing.T) {
 	}
 }
 
+func TestClientDoReturnsGraphQLErrorsOnHTTPError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"errors":[{"message":"Rate limit exceeded","extensions":{"code":"RATELIMITED"}}]}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(server.URL, "linear-key")
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+	err = client.Do(context.Background(), "query { issues { nodes { id } } }", nil, nil)
+	if err == nil {
+		t.Fatal("expected graphql error")
+	}
+	if _, ok := err.(GraphQLErrors); !ok {
+		t.Fatalf("error type = %T", err)
+	}
+	if got, want := err.Error(), "linear graphql errors: Rate limit exceeded (RATELIMITED)"; got != want {
+		t.Fatalf("error = %q, want %q", got, want)
+	}
+}
+
 func TestClientDoReturnsHTTPErrorWithRateLimitHeaders(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-RateLimit-Remaining", "0")
