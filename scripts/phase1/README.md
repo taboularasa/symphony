@@ -84,6 +84,7 @@ LINEAR_API_KEY=... go run ./scripts/phase1 backfill \
   --team Hadto \
   --policy scripts/phase1/backfill_policy.example.json \
   --csv backfill_apply.csv \
+  --timeout 10m \
   --apply
 ```
 
@@ -91,6 +92,9 @@ The migration never removes labels. It skips issues that already have exactly
 one `owner:*` label, reports conflicts when multiple owner labels exist, and
 uses `issueUpdate(input: { addedLabelIds: [...] })` only for safe append
 decisions.
+
+Use `--timeout` for large live applies so reviewed migrations do not fail
+mid-run on the default two-minute command timeout.
 
 The default policy is intentionally conservative:
 

@@ -94,9 +94,13 @@ func runBackfill(args []string) error {
 	tokenEnv := fs.String("token-env", "LINEAR_API_KEY", "environment variable containing the Linear API token")
 	policyPath := fs.String("policy", "scripts/phase1/backfill_policy.example.json", "JSON policy file")
 	csvPath := fs.String("csv", "", "CSV audit output path; default is backfill_<timestamp>.csv")
+	timeout := fs.Duration("timeout", 2*time.Minute, "overall timeout for Linear list/apply requests")
 	apply := fs.Bool("apply", false, "append missing owner labels; default is dry-run")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *timeout <= 0 {
+		return errors.New("timeout must be positive")
 	}
 	policy, err := phase1.LoadBackfillPolicy(*policyPath)
 	if err != nil {
@@ -111,7 +115,7 @@ func runBackfill(args []string) error {
 		return err
 	}
 	backfiller := phase1.Backfiller{Client: client}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 
 	issues, err := backfiller.ListIssues(ctx, *team)
@@ -211,5 +215,5 @@ func usageError(message string) error {
 func printUsage(out *os.File) {
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  go run ./scripts/phase1 labels [--team Hadto] [--token-env LINEAR_API_KEY] [--apply]")
-	fmt.Fprintln(out, "  go run ./scripts/phase1 backfill [--team Hadto] [--policy scripts/phase1/backfill_policy.example.json] [--csv backfill.csv] [--apply]")
+	fmt.Fprintln(out, "  go run ./scripts/phase1 backfill [--team Hadto] [--policy scripts/phase1/backfill_policy.example.json] [--csv backfill.csv] [--timeout 2m] [--apply]")
 }
