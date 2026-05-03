@@ -104,7 +104,7 @@ query SymphonyLinearPoll(
     nodes {
       id
       identifier
-      labels {
+      labels(first: $relationFirst) {
         nodes {
           name
         }
