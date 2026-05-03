@@ -1,0 +1,21 @@
+{
+  "type": "message",
+  "channel": "CAGENTSBRIDGE",
+  "ts": "1714762900.000600",
+  "app_id": "A_DENOVO",
+  "bot_id": "B_DENOVO",
+  "text": "release HAD-123 from denovo",
+  "metadata": {
+    "event_type": "agents_bridge_v1",
+    "event_payload": {
+      "v": 1,
+      "from": "denovo",
+      "kind": "release",
+      "linear_id": "HAD-123",
+      "github_pr": "https://github.com/taboularasa/de-novo/pull/42",
+      "reason": "PR is ready for review.",
+      "ts": "2026-05-03T15:01:40Z"
+    }
+  },
+  "blocks": []
+}
