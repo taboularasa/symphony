@@ -36,6 +36,35 @@ func TestRunLabelsRequiresTokenEnv(t *testing.T) {
 	}
 }
 
+func TestRunBackfillRequiresTokenEnvAfterValidPolicy(t *testing.T) {
+	t.Setenv("SYMPHONY_TEST_LINEAR_TOKEN", "")
+	err := run([]string{
+		"backfill",
+		"--policy", "backfill_policy.example.json",
+		"--token-env", "SYMPHONY_TEST_LINEAR_TOKEN",
+	})
+	if err == nil {
+		t.Fatal("expected missing token error")
+	}
+	if !strings.Contains(err.Error(), "SYMPHONY_TEST_LINEAR_TOKEN is not set") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestRunBackfillRejectsBadPolicy(t *testing.T) {
+	err := run([]string{
+		"backfill",
+		"--policy", "missing-policy.json",
+		"--token-env", "SYMPHONY_TEST_LINEAR_TOKEN",
+	})
+	if err == nil {
+		t.Fatal("expected policy error")
+	}
+	if !strings.Contains(err.Error(), "open policy") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestModeName(t *testing.T) {
 	if got := modeName(false); got != "dry-run" {
 		t.Fatalf("modeName(false) = %q", got)

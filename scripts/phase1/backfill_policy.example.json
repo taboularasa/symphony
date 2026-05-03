@@ -1,0 +1,21 @@
+{
+  "default_owner": "owner:human",
+  "inherit_parent_owner": true,
+  "project_overrides": [
+    {
+      "project": "Hermes",
+      "owner": "owner:hermes",
+      "reason": "historical_hermes_default"
+    },
+    {
+      "project": "De Novo",
+      "owner": "owner:denovo",
+      "reason": "de_novo_project"
+    },
+    {
+      "project": "Symphony",
+      "owner": "owner:human",
+      "reason": "symphony_is_human_until_model_live"
+    }
+  ]
+}

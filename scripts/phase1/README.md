@@ -65,6 +65,56 @@ The implementation handles GraphQL `errors` before reading `data`, treats HTTP
 429 as a failed run, and keeps rate-limit headers in error text without logging
 request or response bodies.
 
+## Owner Backfill
+
+Dry-run owner-label backfill for the Hadto team:
+
+```sh
+LINEAR_API_KEY=... go run ./scripts/phase1 backfill \
+  --team Hadto \
+  --policy scripts/phase1/backfill_policy.example.json \
+  --csv backfill_dry_run.csv
+```
+
+Apply after the dry-run artifact has been reviewed and the labels from
+`HAD-658` exist:
+
+```sh
+LINEAR_API_KEY=... go run ./scripts/phase1 backfill \
+  --team Hadto \
+  --policy scripts/phase1/backfill_policy.example.json \
+  --csv backfill_apply.csv \
+  --apply
+```
+
+The migration never removes labels. It skips issues that already have exactly
+one `owner:*` label, reports conflicts when multiple owner labels exist, and
+uses `issueUpdate(input: { addedLabelIds: [...] })` only for safe append
+decisions.
+
+The default policy is intentionally conservative:
+
+- historical Hermes project: `owner:hermes`
+- current De Novo project: `owner:denovo`
+- Symphony project: `owner:human`
+- all other projects: `owner:human`
+
+Sub-issues inherit their parent owner by default unless the sub-issue's project
+has an explicit override.
+
+The CSV audit file contains only:
+
+- `issue_id`
+- `project`
+- `parent_issue_id`
+- `prior_owner_labels`
+- `applied_label`
+- `decision_reason`
+- `skipped_reason`
+
+Do not commit raw issue bodies, comments, token values, raw API responses, or
+secret-derived values.
+
 ## Owner Views
 
 The CLI does not create Linear custom views in HAD-658. Views are useful for

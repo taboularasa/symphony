@@ -136,3 +136,34 @@ explicit operator approval.
 - Bot-user screenshots attached, or marked human-only pending.
 - Doppler token presence checks attached, or marked human-only pending.
 - Slack channel and membership proof attached, or marked human-only pending.
+
+## 9. Backfill Operator Notes
+
+HAD-659 consumes the labels from this issue. Do not run production backfill apply
+until:
+
+- All four owner labels exist in the Hadto team.
+- The dry-run CSV has been reviewed.
+- The Hermes De Novo ignore rule is still in place.
+
+Run dry-run:
+
+```sh
+LINEAR_API_KEY=... go run ./scripts/phase1 backfill \
+  --team Hadto \
+  --policy scripts/phase1/backfill_policy.example.json \
+  --csv backfill_dry_run.csv
+```
+
+Run apply after review:
+
+```sh
+LINEAR_API_KEY=... go run ./scripts/phase1 backfill \
+  --team Hadto \
+  --policy scripts/phase1/backfill_policy.example.json \
+  --csv backfill_apply.csv \
+  --apply
+```
+
+Attach only the sanitized CSV or a summarized proof note. Do not attach raw
+Linear exports.
