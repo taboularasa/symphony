@@ -1,0 +1,21 @@
+{
+  "type": "message",
+  "channel": "CAGENTSBRIDGE",
+  "ts": "1714762860.000400",
+  "app_id": "A_HERMES",
+  "bot_id": "B_HERMES",
+  "text": "handoff HAD-123 from hermes to denovo",
+  "metadata": {
+    "event_type": "agents_bridge_v1",
+    "event_payload": {
+      "v": 2,
+      "from": "hermes",
+      "kind": "handoff",
+      "linear_id": "HAD-123",
+      "github_pr": "https://github.com/taboularasa/de-novo/pull/42",
+      "reason": "Unsupported future version fixture.",
+      "ts": "2026-05-03T15:01:00Z"
+    }
+  },
+  "blocks": []
+}

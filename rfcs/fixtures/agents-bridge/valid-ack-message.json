@@ -1,0 +1,29 @@
+{
+  "type": "message",
+  "channel": "CAGENTSBRIDGE",
+  "ts": "1714762820.000200",
+  "app_id": "A_DENOVO",
+  "bot_id": "B_DENOVO",
+  "text": "ack HAD-123 from denovo",
+  "metadata": {
+    "event_type": "agents_bridge_v1",
+    "event_payload": {
+      "v": 1,
+      "from": "denovo",
+      "kind": "ack",
+      "linear_id": "HAD-123",
+      "github_pr": null,
+      "reason": null,
+      "ts": "2026-05-03T15:00:20Z"
+    }
+  },
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*ack* `HAD-123` from `denovo`"
+      }
+    }
+  ]
+}
