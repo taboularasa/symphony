@@ -94,6 +94,7 @@ func runBackfill(args []string) error {
 	tokenEnv := fs.String("token-env", "LINEAR_API_KEY", "environment variable containing the Linear API token")
 	policyPath := fs.String("policy", "scripts/phase1/backfill_policy.example.json", "JSON policy file")
 	csvPath := fs.String("csv", "", "CSV audit output path; default is backfill_<timestamp>.csv")
+	planJSONPath := fs.String("plan-json", "", "existing dry-run JSON plan to apply without re-listing issues")
 	timeout := fs.Duration("timeout", 2*time.Minute, "overall timeout for Linear list/apply requests")
 	apply := fs.Bool("apply", false, "append missing owner labels; default is dry-run")
 	if err := fs.Parse(args); err != nil {
@@ -102,10 +103,14 @@ func runBackfill(args []string) error {
 	if *timeout <= 0 {
 		return errors.New("timeout must be positive")
 	}
+	if strings.TrimSpace(*planJSONPath) != "" && !*apply {
+		return errors.New("plan-json requires --apply")
+	}
 	policy, err := phase1.LoadBackfillPolicy(*policyPath)
 	if err != nil {
 		return err
 	}
+	policyHash := fileSHA256(*policyPath)
 	token := strings.TrimSpace(os.Getenv(*tokenEnv))
 	if token == "" {
 		return fmt.Errorf("%s is not set", *tokenEnv)
@@ -118,11 +123,19 @@ func runBackfill(args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 
-	issues, err := backfiller.ListIssues(ctx, *team)
-	if err != nil {
-		return err
+	var decisions []phase1.BackfillDecision
+	if strings.TrimSpace(*planJSONPath) != "" {
+		decisions, err = readBackfillPlan(*planJSONPath, policyHash)
+		if err != nil {
+			return err
+		}
+	} else {
+		issues, err := backfiller.ListIssues(ctx, *team)
+		if err != nil {
+			return err
+		}
+		decisions = phase1.PlanBackfill(policy, issues)
 	}
-	decisions := phase1.PlanBackfill(policy, issues)
 	if *apply {
 		ownerLabelIDs, err := backfiller.ResolveOwnerLabelIDs(ctx, *team)
 		if err != nil {
@@ -141,21 +154,32 @@ func runBackfill(args []string) error {
 	if err := writeBackfillCSVFile(outputPath, decisions); err != nil {
 		return err
 	}
-	output := struct {
-		Mode          string                    `json:"mode"`
-		PolicyHash    string                    `json:"policy_hash"`
-		CSVPath       string                    `json:"csv_path"`
-		IssueCount    int                       `json:"issue_count"`
-		ApplyCount    int                       `json:"apply_count"`
-		SkipCount     int                       `json:"skip_count"`
-		ConflictCount int                       `json:"conflict_count"`
-		Decisions     []phase1.BackfillDecision `json:"decisions"`
-	}{
-		Mode:       modeName(*apply),
-		PolicyHash: fileSHA256(*policyPath),
-		CSVPath:    outputPath,
-		IssueCount: len(decisions),
-		Decisions:  decisions,
+	output := newBackfillOutput(modeName(*apply), policyHash, outputPath, strings.TrimSpace(*planJSONPath), decisions)
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(output)
+}
+
+type backfillCommandOutput struct {
+	Mode          string                    `json:"mode"`
+	PolicyHash    string                    `json:"policy_hash"`
+	CSVPath       string                    `json:"csv_path"`
+	PlanJSONPath  string                    `json:"plan_json_path,omitempty"`
+	IssueCount    int                       `json:"issue_count"`
+	ApplyCount    int                       `json:"apply_count"`
+	SkipCount     int                       `json:"skip_count"`
+	ConflictCount int                       `json:"conflict_count"`
+	Decisions     []phase1.BackfillDecision `json:"decisions"`
+}
+
+func newBackfillOutput(mode, policyHash, csvPath, planJSONPath string, decisions []phase1.BackfillDecision) backfillCommandOutput {
+	output := backfillCommandOutput{
+		Mode:         mode,
+		PolicyHash:   policyHash,
+		CSVPath:      csvPath,
+		PlanJSONPath: planJSONPath,
+		IssueCount:   len(decisions),
+		Decisions:    decisions,
 	}
 	for _, decision := range decisions {
 		switch decision.Action {
@@ -167,9 +191,29 @@ func runBackfill(args []string) error {
 			output.ConflictCount++
 		}
 	}
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(output)
+	return output
+}
+
+func readBackfillPlan(path, expectedPolicyHash string) ([]phase1.BackfillDecision, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("open plan json: %w", err)
+	}
+	defer file.Close()
+	var plan backfillCommandOutput
+	if err := json.NewDecoder(file).Decode(&plan); err != nil {
+		return nil, fmt.Errorf("decode plan json: %w", err)
+	}
+	if strings.TrimSpace(plan.PolicyHash) == "" {
+		return nil, errors.New("plan json missing policy_hash")
+	}
+	if plan.PolicyHash != expectedPolicyHash {
+		return nil, fmt.Errorf("plan json policy hash %s does not match current policy hash %s", plan.PolicyHash, expectedPolicyHash)
+	}
+	if len(plan.Decisions) == 0 && plan.IssueCount > 0 {
+		return nil, errors.New("plan json missing decisions")
+	}
+	return plan.Decisions, nil
 }
 
 func modeName(apply bool) string {
@@ -215,5 +259,5 @@ func usageError(message string) error {
 func printUsage(out *os.File) {
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  go run ./scripts/phase1 labels [--team Hadto] [--token-env LINEAR_API_KEY] [--apply]")
-	fmt.Fprintln(out, "  go run ./scripts/phase1 backfill [--team Hadto] [--policy scripts/phase1/backfill_policy.example.json] [--csv backfill.csv] [--timeout 2m] [--apply]")
+	fmt.Fprintln(out, "  go run ./scripts/phase1 backfill [--team Hadto] [--policy scripts/phase1/backfill_policy.example.json] [--csv backfill.csv] [--plan-json dry-run.json] [--timeout 2m] [--apply]")
 }

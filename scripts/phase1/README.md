@@ -96,6 +96,21 @@ decisions.
 Use `--timeout` for large live applies so reviewed migrations do not fail
 mid-run on the default two-minute command timeout.
 
+If Linear rate limits a live apply after a dry-run has already been reviewed,
+retry from that saved JSON plan to avoid re-scanning the whole team:
+
+```sh
+LINEAR_API_KEY=... go run ./scripts/phase1 backfill \
+  --team Hadto \
+  --policy scripts/phase1/backfill_policy.example.json \
+  --plan-json backfill_dry_run.json \
+  --csv backfill_apply_retry.csv \
+  --timeout 10m \
+  --apply
+```
+
+The plan JSON policy hash must match the current policy file.
+
 The default policy is intentionally conservative:
 
 - historical Hermes project: `owner:hermes`
