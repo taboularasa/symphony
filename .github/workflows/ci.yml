@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  repo:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Check whitespace
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+            git diff --check "origin/${{ github.base_ref }}"...HEAD
+          else
+            git diff --check HEAD~1 HEAD
+          fi
+
+      - name: Run Go tests when module exists
+        run: |
+          if [ -f go.mod ]; then
+            go test ./...
+          else
+            echo "No go.mod yet; skipping Go tests."
+          fi

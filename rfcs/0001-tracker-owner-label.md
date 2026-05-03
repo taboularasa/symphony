@@ -287,7 +287,8 @@ Runtime candidate validation:
 ## References
 
 - SPEC.md sections 5.3, 5.3.1, 6.3, and 6.4.
-- `elixir/README.md` workflow front matter example and Linear consumption notes.
+- Upstream `openai/symphony` Elixir README workflow front matter example and
+  Linear consumption notes.
 - Linear developer documentation for GraphQL filtering: filters are ANDed by
   default, and relationship filtering supports `labels: { name: { eq: ... } }`.
 - Linear label documentation: workspace labels avoid API ambiguity from
