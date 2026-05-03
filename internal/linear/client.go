@@ -85,7 +85,11 @@ func (c *Client) Do(ctx context.Context, query string, variables any, out any) e
 	if err != nil {
 		return fmt.Errorf("read linear graphql response: %w", err)
 	}
+	var envelope graphQLResponse
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		if err := json.Unmarshal(responseBody, &envelope); err == nil && len(envelope.Errors) > 0 {
+			return GraphQLErrors(envelope.Errors)
+		}
 		return HTTPError{
 			StatusCode: resp.StatusCode,
 			RateLimit: RateLimitHeaders{
@@ -96,7 +100,6 @@ func (c *Client) Do(ctx context.Context, query string, variables any, out any) e
 		}
 	}
 
-	var envelope graphQLResponse
 	if err := json.Unmarshal(responseBody, &envelope); err != nil {
 		return fmt.Errorf("decode linear graphql response: %w", err)
 	}
