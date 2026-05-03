@@ -65,6 +65,21 @@ func TestRunBackfillRejectsBadPolicy(t *testing.T) {
 	}
 }
 
+func TestRunBackfillRejectsNonPositiveTimeout(t *testing.T) {
+	err := run([]string{
+		"backfill",
+		"--policy", "backfill_policy.example.json",
+		"--timeout", "0s",
+		"--token-env", "SYMPHONY_TEST_LINEAR_TOKEN",
+	})
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+	if !strings.Contains(err.Error(), "timeout must be positive") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestModeName(t *testing.T) {
 	if got := modeName(false); got != "dry-run" {
 		t.Fatalf("modeName(false) = %q", got)

@@ -162,6 +162,7 @@ LINEAR_API_KEY=... go run ./scripts/phase1 backfill \
   --team Hadto \
   --policy scripts/phase1/backfill_policy.example.json \
   --csv backfill_apply.csv \
+  --timeout 10m \
   --apply
 ```
 
