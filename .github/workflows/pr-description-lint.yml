@@ -7,27 +7,30 @@ on:
 jobs:
   validate-pr-description:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: elixir
 
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Set up mise tools
-        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
-        with:
-          install: true
-          cache: true
-          working_directory: elixir
-
       - name: Validate PR description format
         env:
           PR_BODY_JSON: ${{ toJson(github.event.pull_request.body) }}
         run: |
-          mix local.hex --force
-          mix local.rebar --force
-          mix deps.get
-          printf '%s' "$PR_BODY_JSON" | jq -r '.' > /tmp/pr_body.md
-          mix pr_body.check --file /tmp/pr_body.md
+          body="$(printf '%s' "$PR_BODY_JSON" | jq -r '.')"
+
+          if [ -z "$body" ] || [ "$body" = "null" ]; then
+            echo "PR description is required." >&2
+            exit 1
+          fi
+
+          if printf '%s' "$body" | grep -q '<!--'; then
+            echo "Remove placeholder comments from the PR description." >&2
+            exit 1
+          fi
+
+          for heading in "#### Context" "#### TL;DR" "#### Summary" "#### Alternatives" "#### Test Plan"; do
+            if ! printf '%s' "$body" | grep -Fq "$heading"; then
+              echo "Missing PR template heading: $heading" >&2
+              exit 1
+            fi
+          done

@@ -18,5 +18,6 @@
 
 #### Test Plan
 
-- [ ] `make -C elixir all`
-- [ ] <!-- Additional targeted checks (list below) -->
+- [ ] `git diff --check`
+- [ ] `go test ./...` (when `go.mod` exists)
+- [ ] <!-- Additional targeted checks -->
