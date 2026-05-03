@@ -166,5 +166,18 @@ LINEAR_API_KEY=... go run ./scripts/phase1 backfill \
   --apply
 ```
 
+If apply exhausts Linear's hourly budget after the dry-run has been reviewed,
+retry from the saved dry-run JSON to avoid another full issue scan:
+
+```sh
+LINEAR_API_KEY=... go run ./scripts/phase1 backfill \
+  --team Hadto \
+  --policy scripts/phase1/backfill_policy.example.json \
+  --plan-json backfill_dry_run.json \
+  --csv backfill_apply_retry.csv \
+  --timeout 10m \
+  --apply
+```
+
 Attach only the sanitized CSV or a summarized proof note. Do not attach raw
 Linear exports.

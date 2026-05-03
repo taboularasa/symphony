@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -76,6 +77,38 @@ func TestRunBackfillRejectsNonPositiveTimeout(t *testing.T) {
 		t.Fatal("expected timeout error")
 	}
 	if !strings.Contains(err.Error(), "timeout must be positive") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestRunBackfillRejectsPlanWithoutApply(t *testing.T) {
+	err := run([]string{
+		"backfill",
+		"--plan-json", "dry-run.json",
+	})
+	if err == nil {
+		t.Fatal("expected plan-json error")
+	}
+	if !strings.Contains(err.Error(), "plan-json requires --apply") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestReadBackfillPlanRejectsPolicyMismatch(t *testing.T) {
+	path := t.TempDir() + "/plan.json"
+	err := os.WriteFile(path, []byte(`{
+		"policy_hash":"old",
+		"issue_count":1,
+		"decisions":[{"issue_id":"issue-1","identifier":"HAD-1","action":"apply","applied_label":"owner:human"}]
+	}`), 0o644)
+	if err != nil {
+		t.Fatalf("write plan: %v", err)
+	}
+	_, err = readBackfillPlan(path, "current")
+	if err == nil {
+		t.Fatal("expected policy mismatch")
+	}
+	if !strings.Contains(err.Error(), "does not match current policy hash") {
 		t.Fatalf("error = %v", err)
 	}
 }
