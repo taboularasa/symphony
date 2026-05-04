@@ -96,6 +96,52 @@ go test ./internal/linear -run TestLiveLinearClaimIntegrationRequiresExplicitEnv
 This branch does not cut over production Hermes. HAD-662 owns prompt migration
 and soak/cutover work after bot-token and canary setup are complete.
 
+## Hermes Workflow Migration
+
+The Hermes execution policy now lives in
+[`hermes/WORKFLOW.md`](hermes/WORKFLOW.md). That file is the Go-track Symphony
+source of truth for Hermes-owned Linear work. The supporting migration notes are
+in [`hermes/PROMPT_TRACE.md`](hermes/PROMPT_TRACE.md),
+[`hermes/CTX_HOOKS.md`](hermes/CTX_HOOKS.md), and
+[`hermes/ROLLBACK.md`](hermes/ROLLBACK.md).
+
+Required operator environment:
+
+- `HERMES_LINEAR_TOKEN`: Linear token for the `hermes-bot` claim identity.
+- `#agents-bridge` and bot membership from HAD-658 before live smoke tests.
+- Existing native Slack Socket Mode credentials stay with
+  `hermes-gateway.service`; this workflow does not configure webhook/WASM
+  Slack.
+
+Required workflow fields:
+
+```yaml
+tracker:
+  owner_label: "owner:hermes"
+  claim_assignee: "hermes-bot"
+  require_claim_before_dispatch: true
+migration:
+  legacy_loop_mode: disabled
+  legacy_loop_mutates_linear: false
+  shadow_mode: false
+```
+
+Live cutover gates:
+
+- HAD-659 owner-label backfill is complete.
+- HAD-661 owner-label filtering and claim-assignee preflight are merged in Go.
+- HAD-658 must provide the bot/channel prerequisites before live polling proof.
+- A controlled polling cycle must show only `owner:hermes` issues, a confirmed
+  `claim_win` or already-self claim, and no `owner:denovo` or `owner:human`
+  dispatch candidate.
+- The legacy Hermes issue-selection loop is not disabled until the smoke proof
+  passes. `hermes-gateway.service` remains native Slack Socket Mode.
+
+Soak proof for closing HAD-662 requires 24 hours with zero double-claims, zero
+non-Hermes project pickups, and no false watcher alerts. The paired Hermes code
+change that removes the old project-name ownership block is
+[`taboularasa/hermes-agent` PR #100](https://github.com/taboularasa/hermes-agent/pull/100).
+
 ---
 
 ## License
