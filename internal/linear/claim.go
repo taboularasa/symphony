@@ -56,8 +56,16 @@ func (c IssueClaimer) ClaimIssue(ctx context.Context, issue CandidateIssue, opti
 	}
 	outcome.IssueID = issueID
 
-	if issue.Assignee != nil && issue.Assignee.ID != selfUserID {
-		return classifyClaimOutcome(outcome, issue.Assignee, options), nil
+	current, err := c.fetchIssue(ctx, issueID)
+	if err != nil {
+		return claimError(outcome, fmt.Errorf("read linear issue %s before claim: %w", issueID, err))
+	}
+	if outcome.Identifier == "" {
+		outcome.Identifier = current.Identifier
+	}
+	if current.Assignee != nil && current.Assignee.ID != selfUserID {
+		outcome.ConfirmedIssue = &current
+		return classifyClaimOutcome(outcome, current.Assignee, options), nil
 	}
 
 	if err := c.assignIssue(ctx, issueID, selfUserID); err != nil {
