@@ -19,7 +19,7 @@ codex:
 workspace:
   root: /home/david/stacks
 hooks:
-  timeout_seconds: 60
+  timeout_ms: 60000
   before_run: |
     set -euo pipefail
     if command -v ctx >/dev/null 2>&1; then

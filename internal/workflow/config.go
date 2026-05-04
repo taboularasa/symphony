@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/taboularasa/symphony/internal/phase1"
 	"gopkg.in/yaml.v3"
@@ -26,7 +27,9 @@ type Definition struct {
 }
 
 type Settings struct {
-	Tracker TrackerConfig `yaml:"tracker"`
+	Tracker   TrackerConfig   `yaml:"tracker"`
+	Workspace WorkspaceConfig `yaml:"workspace"`
+	Hooks     HooksConfig     `yaml:"hooks"`
 }
 
 type TrackerConfig struct {
@@ -51,6 +54,16 @@ type LinearConfig struct {
 	RequireClaimBeforeDispatch bool
 	ActiveStates               []string
 	TerminalStates             []string
+}
+
+type WorkspaceConfig struct {
+	Root string `yaml:"root"`
+}
+
+type HooksConfig struct {
+	BeforeRun      string `yaml:"before_run"`
+	TimeoutMS      int    `yaml:"timeout_ms"`
+	TimeoutSeconds int    `yaml:"timeout_seconds"`
 }
 
 type ClaimAssigneeIdentity struct {
@@ -163,7 +176,10 @@ func DecodeSettings(frontMatter []byte) (Settings, error) {
 }
 
 func (s Settings) Validate() error {
-	return s.Tracker.Validate()
+	if err := s.Tracker.Validate(); err != nil {
+		return err
+	}
+	return s.Hooks.Validate()
 }
 
 func (t TrackerConfig) Validate() error {
@@ -247,6 +263,26 @@ func (t TrackerConfig) ResolveLinearConfig(ctx context.Context, resolver ClaimAs
 	}
 	resolved.ClaimAssigneeID = strings.TrimSpace(identity.ID)
 	return resolved, nil
+}
+
+func (h HooksConfig) Validate() error {
+	if h.TimeoutMS < 0 {
+		return errors.New("hooks.timeout_ms must not be negative")
+	}
+	if h.TimeoutSeconds < 0 {
+		return errors.New("hooks.timeout_seconds must not be negative")
+	}
+	return nil
+}
+
+func (h HooksConfig) TimeoutDuration() time.Duration {
+	if h.TimeoutMS > 0 {
+		return time.Duration(h.TimeoutMS) * time.Millisecond
+	}
+	if h.TimeoutSeconds > 0 {
+		return time.Duration(h.TimeoutSeconds) * time.Second
+	}
+	return 60 * time.Second
 }
 
 func (t TrackerConfig) ResolvedAPIKey() string {

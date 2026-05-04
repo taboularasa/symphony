@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestHermesWorkflowFileContract(t *testing.T) {
@@ -66,8 +67,11 @@ func TestHermesWorkflowFileContract(t *testing.T) {
 	}
 
 	hooks := requireMap(t, def.Config, "hooks")
-	if got := requireInt(t, hooks, "timeout_seconds"); got != 60 {
-		t.Fatalf("hook timeout = %d, want 60", got)
+	if got := requireInt(t, hooks, "timeout_ms"); got != 60000 {
+		t.Fatalf("hook timeout = %d, want 60000", got)
+	}
+	if got := def.Settings.Hooks.TimeoutDuration(); got != 60*time.Second {
+		t.Fatalf("typed hook timeout = %s, want 60s", got)
 	}
 	beforeRun := requireString(t, hooks, "before_run")
 	for _, required := range []string{"ctx", "taboularasa/hermes-agent", "taboularasa/phoneitin", "nested Hermes worktree"} {
