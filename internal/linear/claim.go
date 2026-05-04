@@ -33,6 +33,7 @@ type ClaimOutcome struct {
 	Code              ClaimOutcomeCode
 	Dispatchable      bool
 	Retryable         bool
+	ConfirmedIssue    *CandidateIssue
 	ConfirmedAssignee *IssueUser
 }
 
@@ -65,6 +66,7 @@ func (c IssueClaimer) ClaimIssue(ctx context.Context, issue CandidateIssue, opti
 	if outcome.Identifier == "" {
 		outcome.Identifier = confirmed.Identifier
 	}
+	outcome.ConfirmedIssue = &confirmed
 	return classifyClaimOutcome(outcome, confirmed.Assignee, options), nil
 }
 
