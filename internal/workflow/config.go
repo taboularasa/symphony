@@ -182,6 +182,24 @@ func (t TrackerConfig) Validate() error {
 	return nil
 }
 
+func (t TrackerConfig) ValidateOwnerClaimContract(ownerLabel, claimAssignee string, requireClaim bool) error {
+	if err := t.Validate(); err != nil {
+		return err
+	}
+	ownerLabel = normalizeOwnerLabel(ownerLabel)
+	if ownerLabel != "" && t.NormalizedOwnerLabel() != ownerLabel {
+		return fmt.Errorf("tracker.owner_label must be %q", ownerLabel)
+	}
+	claimAssignee = strings.TrimSpace(claimAssignee)
+	if claimAssignee != "" && t.NormalizedClaimAssignee() != claimAssignee {
+		return fmt.Errorf("tracker.claim_assignee must be %q", claimAssignee)
+	}
+	if requireClaim && !t.RequireClaimBeforeDispatch {
+		return errors.New("tracker.require_claim_before_dispatch must be true")
+	}
+	return nil
+}
+
 func (t TrackerConfig) ResolveLinearConfig(ctx context.Context, resolver ClaimAssigneeResolver) (LinearConfig, error) {
 	if err := t.Validate(); err != nil {
 		return LinearConfig{}, err
