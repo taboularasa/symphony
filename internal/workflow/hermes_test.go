@@ -95,6 +95,54 @@ func TestHermesWorkflowFileContract(t *testing.T) {
 	}
 }
 
+func TestHermesWorkflowPromptGuardrailSnapshot(t *testing.T) {
+	def, err := Load(filepath.Join("..", "..", "hermes", "WORKFLOW.md"))
+	if err != nil {
+		t.Fatalf("load Hermes workflow: %v", err)
+	}
+
+	requiredSections := []string{
+		"# Hermes Execution Manager",
+		"## Operating Contract",
+		"## Engineering-Manager Behavior",
+		"## Workspace And ctx Contract",
+		"## Runtime Boundaries",
+		"## Verification And Handoff",
+	}
+	for _, section := range requiredSections {
+		if !strings.Contains(def.Prompt, section) {
+			t.Fatalf("workflow prompt missing section %q", section)
+		}
+	}
+
+	requiredGuardrails := map[string]string{
+		"owner label only":         "positive owner-label rule, not a project-name denial list.",
+		"claim gate":               "do not launch implementation work unless the claim result is",
+		"delegation uniqueness":    "spawning duplicate work for the same issue",
+		"ctx source of truth":      "Use the ctx-managed worktree as the source of truth",
+		"native Slack boundary":    "Hermes Slack on this host stays in native Slack Socket Mode",
+		"durable evidence":         "Prefer durable artifacts over status narration",
+		"no secret copying":        "Never copy raw tokens, API keys, private logs, or secret-bearing config values",
+		"unavailable checks block": "If a check cannot run, leave the",
+	}
+	for name, fragment := range requiredGuardrails {
+		if !strings.Contains(def.Prompt, fragment) {
+			t.Fatalf("workflow prompt missing %s guardrail %q", name, fragment)
+		}
+	}
+
+	for _, legacy := range []string{
+		"Never auto-delegate or auto-assign De Novo project issues",
+		"issue belongs to project `De Novo`",
+		"de_novo_block",
+		"DENOVO_LINEAR_TOKEN",
+	} {
+		if strings.Contains(def.Prompt, legacy) {
+			t.Fatalf("workflow prompt kept legacy project-name ownership rule %q", legacy)
+		}
+	}
+}
+
 func TestHermesWorkflowRejectsMissingOwnerClaimContract(t *testing.T) {
 	tests := []struct {
 		name string

@@ -63,6 +63,11 @@ prompt composition, ephemeral prompt injection, gateway config loading, and ctx
 binding notes. The workflow migration should place Hermes EM policy in
 `hermes/WORKFLOW.md` while leaving reusable runtime mechanics in Hermes.
 
+The item 4 prompt-body trace is recorded in `hermes/PROMPT_TRACE.md`. That file
+lists each prompt source inspected, what was migrated into `WORKFLOW.md`, and
+which snippets remain generic Hermes runtime behavior instead of Hermes EM
+policy.
+
 ctx host tooling at `/home/david/code/ctx-host-tools` is a conservative
 host-side orphan-task reaper. It is not the ctx daemon source. HAD-662 hook work
 should observe ctx binding/worktree metadata without copying private task data.
