@@ -18,6 +18,14 @@ codex:
   thread_sandbox: workspace-write
 workspace:
   root: /home/david/stacks
+migration:
+  legacy_loop_mode: disabled
+  legacy_loop_mutates_linear: false
+  shadow_mode: false
+  rollback:
+    symphony_user_unit: symphony-hermes.service
+    legacy_gateway_unit: hermes-gateway.service
+    workflow_flag: migration.legacy_loop_mode
 hooks:
   timeout_ms: 60000
   before_run: |

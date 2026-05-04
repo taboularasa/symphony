@@ -157,15 +157,35 @@ func TestRestartRecoveryAllowsSelfAssignedActiveIssue(t *testing.T) {
 	}
 }
 
+func TestTwoSchedulersCannotBothDispatchOwnerLabeledIssue(t *testing.T) {
+	issue := testDispatchIssue("HAD-1", "In Progress", &IssueUser{ID: "user-agent-a"}, "owner:hermes")
+	agentAPolicy := testDispatchPolicyFor("user-agent-a", "user-agent-b")
+	agentBPolicy := testDispatchPolicyFor("user-agent-b", "user-agent-a")
+
+	agentADecision := EvaluateRestartRecovery(issue, agentAPolicy)
+	if agentADecision.Code != DispatchDecisionAllow || !agentADecision.Dispatchable {
+		t.Fatalf("agent A decision = %+v, want dispatch allowed", agentADecision)
+	}
+
+	agentBDecision := EvaluateRestartRecovery(issue, agentBPolicy)
+	if agentBDecision.Code != DispatchDecisionClaimLossOtherAgent || agentBDecision.Dispatchable {
+		t.Fatalf("agent B decision = %+v, want other-agent claim loss", agentBDecision)
+	}
+}
+
 func testDispatchPolicy() DispatchPolicy {
+	return testDispatchPolicyFor("user-self", "user-other-agent")
+}
+
+func testDispatchPolicyFor(selfUserID string, otherAgentIDs ...string) DispatchPolicy {
 	return DispatchPolicy{
 		OwnerLabel:                 "owner:hermes",
 		RequireClaimBeforeDispatch: true,
 		ActiveStates:               []string{"Todo", "In Progress"},
 		TerminalStates:             []string{"Done", "Canceled"},
 		Claim: ClaimOptions{
-			SelfUserID:   "user-self",
-			AgentUserIDs: []string{"user-other-agent"},
+			SelfUserID:   selfUserID,
+			AgentUserIDs: otherAgentIDs,
 		},
 	}
 }

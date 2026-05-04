@@ -66,6 +66,24 @@ func TestHermesWorkflowFileContract(t *testing.T) {
 		t.Fatalf("workspace root = %q, want /home/david/stacks", got)
 	}
 
+	migration := requireMap(t, def.Config, "migration")
+	if got := requireString(t, migration, "legacy_loop_mode"); got != "disabled" {
+		t.Fatalf("legacy loop mode = %q, want disabled", got)
+	}
+	if got := requireBool(t, migration, "legacy_loop_mutates_linear"); got {
+		t.Fatal("legacy loop must not mutate Linear by default")
+	}
+	if got := requireBool(t, migration, "shadow_mode"); got {
+		t.Fatal("Hermes migration must default to no shadow dispatcher")
+	}
+	rollback := requireMap(t, migration, "rollback")
+	if got := requireString(t, rollback, "symphony_user_unit"); got != "symphony-hermes.service" {
+		t.Fatalf("symphony unit = %q, want symphony-hermes.service", got)
+	}
+	if got := requireString(t, rollback, "legacy_gateway_unit"); got != "hermes-gateway.service" {
+		t.Fatalf("legacy gateway unit = %q, want hermes-gateway.service", got)
+	}
+
 	hooks := requireMap(t, def.Config, "hooks")
 	if got := requireInt(t, hooks, "timeout_ms"); got != 60000 {
 		t.Fatalf("hook timeout = %d, want 60000", got)
@@ -257,6 +275,19 @@ func requireInt(t *testing.T, values map[string]any, key string) int {
 		t.Fatalf("config %q has type %T, want int", key, value)
 	}
 	return 0
+}
+
+func requireBool(t *testing.T, values map[string]any, key string) bool {
+	t.Helper()
+	value, ok := values[key]
+	if !ok {
+		t.Fatalf("missing config bool %q", key)
+	}
+	boolean, ok := value.(bool)
+	if !ok {
+		t.Fatalf("config %q has type %T, want bool", key, value)
+	}
+	return boolean
 }
 
 func ExampleTrackerConfig_ValidateOwnerClaimContract() {
