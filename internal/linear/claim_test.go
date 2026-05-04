@@ -208,6 +208,95 @@ func TestIssueClaimerMarksRateLimitErrorsRetryable(t *testing.T) {
 	}
 }
 
+func TestIssueClaimerEmitsClaimMetricsAndStructuredEvents(t *testing.T) {
+	observer := &InMemoryClaimObserver{}
+
+	winClient := &claimFakeClient{
+		responses: []any{
+			claimMutationPayload(true),
+			claimConfirmPayload(candidateNodeWithAssignee("HAD-1", &IssueUser{ID: "user-self"}, "owner:hermes")),
+		},
+	}
+	if _, err := (IssueClaimer{Client: winClient, Observer: observer}).ClaimIssue(
+		context.Background(),
+		CandidateIssue{ID: "issue-1", Identifier: "HAD-1"},
+		ClaimOptions{SelfUserID: "user-self"},
+	); err != nil {
+		t.Fatalf("win claim: %v", err)
+	}
+
+	if _, err := (IssueClaimer{Client: &claimFakeClient{}, Observer: observer}).ClaimIssue(
+		context.Background(),
+		CandidateIssue{ID: "issue-2", Identifier: "HAD-2", Assignee: &IssueUser{ID: "user-human"}},
+		ClaimOptions{SelfUserID: "user-self"},
+	); err != nil {
+		t.Fatalf("loss claim: %v", err)
+	}
+
+	errorClient := &claimFakeClient{
+		errs: []error{GraphQLErrors{{
+			Message:    "rate limited",
+			Extensions: map[string]any{"code": "RATELIMITED"},
+		}}},
+	}
+	if _, err := (IssueClaimer{Client: errorClient, Observer: observer}).ClaimIssue(
+		context.Background(),
+		CandidateIssue{ID: "issue-3", Identifier: "HAD-3"},
+		ClaimOptions{SelfUserID: "user-self"},
+	); err == nil {
+		t.Fatal("expected error claim")
+	}
+
+	if observer.Metrics.ClaimAttempts != 3 || observer.Metrics.ClaimWins != 1 || observer.Metrics.ClaimLosses != 1 || observer.Metrics.ClaimErrors != 1 {
+		t.Fatalf("metrics = %+v", observer.Metrics)
+	}
+	if len(observer.Events) != 3 {
+		t.Fatalf("events = %d, want 3", len(observer.Events))
+	}
+	for _, event := range observer.Events {
+		if event.LinearID == "" || event.ReasonCode == "" {
+			t.Fatalf("event missing grep fields: %+v", event)
+		}
+		if event.ReasonCode != string(event.Outcome) {
+			t.Fatalf("event reason code = %q outcome = %q", event.ReasonCode, event.Outcome)
+		}
+	}
+	if observer.Events[0].LinearID != "HAD-1" || observer.Events[0].Outcome != ClaimOutcomeWin || !observer.Events[0].Dispatchable {
+		t.Fatalf("win event = %+v", observer.Events[0])
+	}
+	if observer.Events[1].Outcome != ClaimOutcomeLossHuman || observer.Events[1].Dispatchable {
+		t.Fatalf("loss event = %+v", observer.Events[1])
+	}
+	if observer.Events[2].Outcome != ClaimOutcomeError || !observer.Events[2].Retryable {
+		t.Fatalf("error event = %+v", observer.Events[2])
+	}
+}
+
+func TestClaimEventOmitsSensitivePayloadFields(t *testing.T) {
+	event := NewClaimEvent(ClaimOutcome{
+		IssueID:      "issue-1",
+		Identifier:   "HAD-1",
+		Code:         ClaimOutcomeError,
+		Dispatchable: false,
+		Retryable:    true,
+	})
+	data, err := json.Marshal(event)
+	if err != nil {
+		t.Fatalf("marshal event: %v", err)
+	}
+	encoded := string(data)
+	for _, want := range []string{`"linear_id":"HAD-1"`, `"reason_code":"claim_error"`, `"retryable":true`} {
+		if !strings.Contains(encoded, want) {
+			t.Fatalf("event json = %s, want %s", encoded, want)
+		}
+	}
+	for _, forbidden := range []string{"description", "comments", "token", "api_key", "response_body", "raw"} {
+		if strings.Contains(encoded, forbidden) {
+			t.Fatalf("event json leaked forbidden field %q: %s", forbidden, encoded)
+		}
+	}
+}
+
 type claimFakeClient struct {
 	calls     []claimCall
 	responses []any

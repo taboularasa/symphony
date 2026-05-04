@@ -9,7 +9,8 @@ import (
 )
 
 type IssueClaimer struct {
-	Client GraphQLClient
+	Client   GraphQLClient
+	Observer ClaimObserver
 }
 
 type ClaimOptions struct {
@@ -37,8 +38,11 @@ type ClaimOutcome struct {
 	ConfirmedAssignee *IssueUser
 }
 
-func (c IssueClaimer) ClaimIssue(ctx context.Context, issue CandidateIssue, options ClaimOptions) (ClaimOutcome, error) {
-	outcome := ClaimOutcome{IssueID: issue.ID, Identifier: issue.Identifier}
+func (c IssueClaimer) ClaimIssue(ctx context.Context, issue CandidateIssue, options ClaimOptions) (outcome ClaimOutcome, err error) {
+	outcome = ClaimOutcome{IssueID: issue.ID, Identifier: issue.Identifier}
+	defer func() {
+		c.observeClaim(outcome)
+	}()
 	if c.Client == nil {
 		return claimError(outcome, errors.New("linear client is required"))
 	}
@@ -68,6 +72,13 @@ func (c IssueClaimer) ClaimIssue(ctx context.Context, issue CandidateIssue, opti
 	}
 	outcome.ConfirmedIssue = &confirmed
 	return classifyClaimOutcome(outcome, confirmed.Assignee, options), nil
+}
+
+func (c IssueClaimer) observeClaim(outcome ClaimOutcome) {
+	if c.Observer == nil {
+		return
+	}
+	c.Observer.ObserveClaim(NewClaimEvent(outcome))
 }
 
 func (c IssueClaimer) assignIssue(ctx context.Context, issueID, assigneeID string) error {
