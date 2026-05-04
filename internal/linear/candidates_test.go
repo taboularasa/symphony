@@ -162,6 +162,142 @@ func TestCandidatePollerLeavesLegacyCandidatesUnfiltered(t *testing.T) {
 	}
 }
 
+func TestCandidateIssueNormalizationRecordsOwnerState(t *testing.T) {
+	node := candidateNode("HAD-1", " OWNER:Hermes ", "owner:hermes", "Risk:High")
+	node.Labels.Nodes[0].ID = " label-1 "
+	issue, err := node.toCandidateIssue("owner:hermes")
+	if err != nil {
+		t.Fatalf("normalize issue: %v", err)
+	}
+	if got, want := labelNames(issue.Labels), []string{"owner:hermes", "owner:hermes", "risk:high"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("labels = %#v, want %#v", got, want)
+	}
+	if issue.Labels[0].ID != "label-1" {
+		t.Fatalf("label id = %q", issue.Labels[0].ID)
+	}
+	if issue.Owner.Label != "owner:hermes" {
+		t.Fatalf("owner label = %q", issue.Owner.Label)
+	}
+	if got, want := issue.Owner.Labels, []string{"owner:hermes"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("owner labels = %#v, want %#v", got, want)
+	}
+	if issue.Owner.ConflictReason != "" {
+		t.Fatalf("conflict reason = %q, want empty", issue.Owner.ConflictReason)
+	}
+
+	conflict, err := candidateNode("HAD-2", "owner:denovo", "owner:hermes").toCandidateIssue("owner:hermes")
+	if err != nil {
+		t.Fatalf("normalize conflict: %v", err)
+	}
+	if conflict.Owner.ConflictReason != OwnerConflictMultiple {
+		t.Fatalf("multiple owner conflict = %q, want %q", conflict.Owner.ConflictReason, OwnerConflictMultiple)
+	}
+
+	mismatch, err := candidateNode("HAD-3", "owner:denovo").toCandidateIssue("owner:hermes")
+	if err != nil {
+		t.Fatalf("normalize mismatch: %v", err)
+	}
+	if mismatch.Owner.ConflictReason != OwnerConflictMismatch {
+		t.Fatalf("owner mismatch = %q, want %q", mismatch.Owner.ConflictReason, OwnerConflictMismatch)
+	}
+
+	missing, err := candidateNode("HAD-4").toCandidateIssue("owner:hermes")
+	if err != nil {
+		t.Fatalf("normalize missing owner: %v", err)
+	}
+	if missing.Owner.ConflictReason != OwnerConflictMissing {
+		t.Fatalf("missing owner = %q, want %q", missing.Owner.ConflictReason, OwnerConflictMissing)
+	}
+}
+
+func TestCandidateIssueNormalizationRecordsAssigneeState(t *testing.T) {
+	unassigned, err := candidateNode("HAD-1", "owner:hermes").toCandidateIssue("owner:hermes")
+	if err != nil {
+		t.Fatalf("normalize unassigned: %v", err)
+	}
+	if unassigned.Assignee != nil {
+		t.Fatalf("unassigned issue has assignee: %+v", unassigned.Assignee)
+	}
+
+	humanNode := candidateNodeWithAssignee("HAD-2", &IssueUser{
+		ID:    " user-human ",
+		Name:  " David ",
+		Email: " david@hadto.net ",
+	}, "owner:hermes")
+	human, err := humanNode.toCandidateIssue("owner:hermes")
+	if err != nil {
+		t.Fatalf("normalize human assignee: %v", err)
+	}
+	if human.Assignee == nil || human.Assignee.ID != "user-human" || human.Assignee.Name != "David" || human.Assignee.Email != "david@hadto.net" {
+		t.Fatalf("human assignee = %+v", human.Assignee)
+	}
+	if !human.AssignedTo("user-human") || human.AssignedTo("user-self") {
+		t.Fatalf("human assignment match state is wrong")
+	}
+
+	selfNode := candidateNodeWithAssignee("HAD-3", &IssueUser{ID: "user-self", Name: "hermes-bot"}, "owner:hermes")
+	self, err := selfNode.toCandidateIssue("owner:hermes")
+	if err != nil {
+		t.Fatalf("normalize self assignee: %v", err)
+	}
+	if !self.AssignedTo("user-self") {
+		t.Fatalf("self assignment not detected: %+v", self.Assignee)
+	}
+}
+
+func TestCandidateIssueNormalizationRejectsMalformedPayloads(t *testing.T) {
+	tests := []struct {
+		name string
+		node candidateIssueNode
+		want string
+	}{
+		{
+			name: "missing id",
+			node: candidateIssueNode{Identifier: "HAD-1"},
+			want: "linear candidate issue missing id",
+		},
+		{
+			name: "missing identifier",
+			node: candidateIssueNode{ID: "issue-1"},
+			want: `linear candidate issue "issue-1" missing identifier`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.node.toCandidateIssue("")
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v, want %q", err, tt.want)
+			}
+		})
+	}
+}
+
+func TestCandidateIssueNormalizationAllowsMissingOptionalFields(t *testing.T) {
+	issue, err := candidateIssueNode{ID: " issue-1 ", Identifier: " HAD-1 "}.toCandidateIssue("")
+	if err != nil {
+		t.Fatalf("normalize issue: %v", err)
+	}
+	if issue.ID != "issue-1" || issue.Identifier != "HAD-1" {
+		t.Fatalf("trimmed identity = id:%q identifier:%q", issue.ID, issue.Identifier)
+	}
+	if issue.URL != "" || issue.Project.Name != "" || issue.State.Name != "" {
+		t.Fatalf("optional fields = url:%q project:%+v state:%+v", issue.URL, issue.Project, issue.State)
+	}
+	if issue.Assignee != nil || len(issue.Labels) != 0 || issue.Owner.ConflictReason != "" {
+		t.Fatalf("optional normalized fields = assignee:%+v labels:%+v owner:%+v", issue.Assignee, issue.Labels, issue.Owner)
+	}
+}
+
+func TestCandidateIssueShapeOmitsUnsafePayloadFields(t *testing.T) {
+	issueType := reflect.TypeOf(CandidateIssue{})
+	for _, field := range []string{"Description", "Comments", "Token", "APIKey", "RawResponse"} {
+		if _, ok := issueType.FieldByName(field); ok {
+			t.Fatalf("CandidateIssue must not expose unsafe raw field %s", field)
+		}
+	}
+}
+
 func TestCandidatePollerPropagatesLinearErrors(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -323,10 +459,24 @@ func candidateNode(identifier string, labels ...string) candidateIssueNode {
 	return node
 }
 
+func candidateNodeWithAssignee(identifier string, assignee *IssueUser, labels ...string) candidateIssueNode {
+	node := candidateNode(identifier, labels...)
+	node.Assignee = assignee
+	return node
+}
+
 func identifiers(issues []CandidateIssue) []string {
 	result := make([]string, 0, len(issues))
 	for _, issue := range issues {
 		result = append(result, issue.Identifier)
+	}
+	return result
+}
+
+func labelNames(labels []IssueLabel) []string {
+	result := make([]string, 0, len(labels))
+	for _, label := range labels {
+		result = append(result, label.Name)
 	}
 	return result
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -34,7 +35,9 @@ type CandidateIssue struct {
 	URL        string
 	Project    IssueProject
 	State      IssueState
+	Assignee   *IssueUser
 	Labels     []IssueLabel
+	Owner      OwnerLabelState
 }
 
 type IssueProject struct {
@@ -52,6 +55,29 @@ type IssueLabel struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Color string `json:"color,omitempty"`
+}
+
+type IssueUser struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+type OwnerLabelState struct {
+	Label          string
+	Labels         []string
+	ConflictReason string
+}
+
+const (
+	OwnerConflictMissing  = "owner_label_missing"
+	OwnerConflictMismatch = "owner_label_mismatch"
+	OwnerConflictMultiple = "owner_label_conflict"
+)
+
+func (i CandidateIssue) AssignedTo(userID string) bool {
+	userID = strings.TrimSpace(userID)
+	return userID != "" && i.Assignee != nil && i.Assignee.ID == userID
 }
 
 func (p CandidatePoller) FetchCandidateIssues(ctx context.Context, options CandidateQueryOptions) ([]CandidateIssue, error) {
@@ -72,7 +98,10 @@ func (p CandidatePoller) FetchCandidateIssues(ctx context.Context, options Candi
 			return nil, fmt.Errorf("fetch linear candidate issues: %w", err)
 		}
 		for _, node := range out.Issues.Nodes {
-			issue := node.toCandidateIssue()
+			issue, err := node.toCandidateIssue(normalized.OwnerLabel)
+			if err != nil {
+				return nil, err
+			}
 			if !candidateMatchesOwner(issue, normalized.OwnerLabel) {
 				continue
 			}
@@ -132,18 +161,7 @@ func candidateMatchesOwner(issue CandidateIssue, ownerLabel string) bool {
 	if ownerLabel == "" {
 		return true
 	}
-	owners := map[string]struct{}{}
-	for _, label := range issue.Labels {
-		name := normalizeOwnerLabel(label.Name)
-		if strings.HasPrefix(name, "owner:") {
-			owners[name] = struct{}{}
-		}
-	}
-	if len(owners) != 1 {
-		return false
-	}
-	_, ok := owners[ownerLabel]
-	return ok
+	return issue.Owner.ConflictReason == "" && issue.Owner.Label == ownerLabel
 }
 
 func normalizedStringList(values []string) []string {
@@ -174,20 +192,108 @@ type candidateIssueNode struct {
 	URL        string       `json:"url"`
 	Project    IssueProject `json:"project"`
 	State      IssueState   `json:"state"`
+	Assignee   *IssueUser   `json:"assignee"`
 	Labels     struct {
 		Nodes []IssueLabel `json:"nodes"`
 	} `json:"labels"`
 }
 
-func (n candidateIssueNode) toCandidateIssue() CandidateIssue {
-	return CandidateIssue{
-		ID:         n.ID,
-		Identifier: n.Identifier,
-		URL:        n.URL,
-		Project:    n.Project,
-		State:      n.State,
-		Labels:     n.Labels.Nodes,
+func (n candidateIssueNode) toCandidateIssue(expectedOwnerLabel string) (CandidateIssue, error) {
+	id := strings.TrimSpace(n.ID)
+	if id == "" {
+		return CandidateIssue{}, errors.New("linear candidate issue missing id")
 	}
+	identifier := strings.TrimSpace(n.Identifier)
+	if identifier == "" {
+		return CandidateIssue{}, fmt.Errorf("linear candidate issue %q missing identifier", id)
+	}
+	labels := normalizeLabels(n.Labels.Nodes)
+	return CandidateIssue{
+		ID:         id,
+		Identifier: identifier,
+		URL:        strings.TrimSpace(n.URL),
+		Project:    normalizeProject(n.Project),
+		State:      normalizeState(n.State),
+		Assignee:   normalizeUser(n.Assignee),
+		Labels:     labels,
+		Owner:      normalizeOwnerState(labels, expectedOwnerLabel),
+	}, nil
+}
+
+func normalizeLabels(labels []IssueLabel) []IssueLabel {
+	result := make([]IssueLabel, 0, len(labels))
+	for _, label := range labels {
+		result = append(result, IssueLabel{
+			ID:    strings.TrimSpace(label.ID),
+			Name:  strings.ToLower(strings.TrimSpace(label.Name)),
+			Color: strings.TrimSpace(label.Color),
+		})
+	}
+	return result
+}
+
+func normalizeProject(project IssueProject) IssueProject {
+	return IssueProject{
+		ID:     strings.TrimSpace(project.ID),
+		Name:   strings.TrimSpace(project.Name),
+		SlugID: strings.TrimSpace(project.SlugID),
+	}
+}
+
+func normalizeState(state IssueState) IssueState {
+	return IssueState{
+		Name: strings.TrimSpace(state.Name),
+		Type: strings.TrimSpace(state.Type),
+	}
+}
+
+func normalizeUser(user *IssueUser) *IssueUser {
+	if user == nil {
+		return nil
+	}
+	return &IssueUser{
+		ID:    strings.TrimSpace(user.ID),
+		Name:  strings.TrimSpace(user.Name),
+		Email: strings.TrimSpace(user.Email),
+	}
+}
+
+func normalizeOwnerState(labels []IssueLabel, expectedOwnerLabel string) OwnerLabelState {
+	ownersByName := map[string]struct{}{}
+	for _, label := range labels {
+		if strings.HasPrefix(label.Name, "owner:") {
+			ownersByName[label.Name] = struct{}{}
+		}
+	}
+
+	owners := make([]string, 0, len(ownersByName))
+	for owner := range ownersByName {
+		owners = append(owners, owner)
+	}
+	sort.Strings(owners)
+
+	state := OwnerLabelState{Labels: owners}
+	if len(owners) == 1 {
+		state.Label = owners[0]
+	}
+	if expectedOwnerLabel == "" {
+		if len(owners) > 1 {
+			state.ConflictReason = OwnerConflictMultiple
+		}
+		return state
+	}
+
+	switch len(owners) {
+	case 0:
+		state.ConflictReason = OwnerConflictMissing
+	case 1:
+		if owners[0] != expectedOwnerLabel {
+			state.ConflictReason = OwnerConflictMismatch
+		}
+	default:
+		state.ConflictReason = OwnerConflictMultiple
+	}
+	return state
 }
 
 type pageInfo struct {
@@ -218,6 +324,11 @@ query SymphonyLinearCandidateIssues($projectSlug: String!, $stateNames: [String!
       state {
         name
         type
+      }
+      assignee {
+        id
+        name
+        email
       }
       labels(first: $relationFirst, includeArchived: false) {
         nodes {
@@ -255,6 +366,11 @@ query SymphonyLinearCandidateIssues($projectSlug: String!, $stateNames: [String!
       state {
         name
         type
+      }
+      assignee {
+        id
+        name
+        email
       }
       labels(first: $relationFirst, includeArchived: false) {
         nodes {
