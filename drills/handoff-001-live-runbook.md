@@ -18,7 +18,11 @@ As of 2026-06-04, the live drill is not ready to execute:
 - Hermes Slack bot auth succeeds as `hermes`.
 - `#agents-bridge` is visible as `C0B83H1F15K`, and the Hermes bot is a
   member.
-- `#hermes-ops` and `#denovo-ops` are not visible to the current bot token.
+- `#hermes-ops` is visible as `C0B8E7L2T9A`, and the Hermes bot is a
+  member.
+- `#denovo-ops` is visible as `C0B8AJQG68J`. The Hermes bot is not a member,
+  which is acceptable for the Hermes proof path; invite the future De Novo bot
+  when that app identity is provisioned.
 - `symphony-agent-watcher-soak.service` is running as a transient user unit,
   started at 2026-06-04 01:30:25 PDT.
 - `taboularasa/de-novo` PR #143 is still draft and its live two-orchestrator
