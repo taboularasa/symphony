@@ -6,6 +6,8 @@ teams can manage work instead of supervising coding agents.
 This fork is the Hadto Go implementation track. New implementation code in this
 repository must be written in Go.
 
+Owner-backstop smoke PR marker.
+
 The upstream Elixir reference implementation is intentionally not vendored here.
 Use the upstream repository as historical reference only:
 
