@@ -19,6 +19,9 @@ The live execution is intentionally separate from the reusable harness. Running
 the real drill requires the HAD-664 De Novo path, the HAD-665 identity backstop,
 and the HAD-666 watcher soak to be ready for live writes.
 
+Live-run preparation and rollback steps are tracked in
+[`handoff-001-live-runbook.md`](handoff-001-live-runbook.md).
+
 ## Normalized Event Artifact
 
 `drills/run.go` validates a normalized JSON artifact. It does not store secrets,
