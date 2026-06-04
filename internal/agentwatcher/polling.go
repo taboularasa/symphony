@@ -12,7 +12,7 @@ import (
 )
 
 const linearPollQuery = `
-query AgentWatcherPoll($since: DateTime!, $first: Int!, $after: String) {
+query AgentWatcherPoll($since: DateTimeOrDuration!, $first: Int!, $after: String) {
   issues(filter: { updatedAt: { gte: $since } }, first: $first, after: $after, orderBy: updatedAt) {
     nodes {
       id
