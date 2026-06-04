@@ -157,6 +157,23 @@ func TestRestartRecoveryAllowsSelfAssignedActiveIssue(t *testing.T) {
 	}
 }
 
+func TestRestartRecoveryAllowsSelfDelegatedActiveIssue(t *testing.T) {
+	issue := testDispatchIssue("HAD-1", "In Progress", &IssueUser{ID: "user-human"}, "owner:hermes")
+	issue.Delegate = &IssueUser{ID: "user-hermes", Name: "Hermes"}
+	decision := EvaluateRestartRecovery(issue, testDelegateDispatchPolicy())
+	if decision.Code != DispatchDecisionAllow || !decision.Dispatchable || decision.StopRunning {
+		t.Fatalf("decision = %+v, want delegate restart recovery allowed", decision)
+	}
+}
+
+func TestRestartRecoveryBlocksMissingDelegateClaim(t *testing.T) {
+	issue := testDispatchIssue("HAD-1", "In Progress", &IssueUser{ID: "user-human"}, "owner:hermes")
+	decision := EvaluateRestartRecovery(issue, testDelegateDispatchPolicy())
+	if decision.Code != DispatchDecisionClaimCleared || decision.Dispatchable {
+		t.Fatalf("decision = %+v, want missing delegate claim", decision)
+	}
+}
+
 func TestTwoSchedulersCannotBothDispatchOwnerLabeledIssue(t *testing.T) {
 	issue := testDispatchIssue("HAD-1", "In Progress", &IssueUser{ID: "user-agent-a"}, "owner:hermes")
 	agentAPolicy := testDispatchPolicyFor("user-agent-a", "user-agent-b")
@@ -175,6 +192,12 @@ func TestTwoSchedulersCannotBothDispatchOwnerLabeledIssue(t *testing.T) {
 
 func testDispatchPolicy() DispatchPolicy {
 	return testDispatchPolicyFor("user-self", "user-other-agent")
+}
+
+func testDelegateDispatchPolicy() DispatchPolicy {
+	policy := testDispatchPolicyFor("user-hermes", "user-denovo")
+	policy.Claim.Target = "delegate"
+	return policy
 }
 
 func testDispatchPolicyFor(selfUserID string, otherAgentIDs ...string) DispatchPolicy {

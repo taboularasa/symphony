@@ -52,11 +52,9 @@ func TestIssueClaimerHappyPathRequiresConfirmation(t *testing.T) {
 	}
 }
 
-func TestIssueClaimerAlreadySelfAssignedStillConfirms(t *testing.T) {
+func TestIssueClaimerAlreadySelfAssignedWinsWithoutMutation(t *testing.T) {
 	client := &claimFakeClient{
 		responses: []any{
-			claimConfirmPayload(candidateNodeWithAssignee("HAD-1", &IssueUser{ID: "user-self"}, "owner:hermes")),
-			claimMutationPayload(true),
 			claimConfirmPayload(candidateNodeWithAssignee("HAD-1", &IssueUser{ID: "user-self"}, "owner:hermes")),
 		},
 	}
@@ -73,8 +71,8 @@ func TestIssueClaimerAlreadySelfAssignedStillConfirms(t *testing.T) {
 	if outcome.Code != ClaimOutcomeWin || !outcome.Dispatchable {
 		t.Fatalf("outcome = %+v, want dispatchable win", outcome)
 	}
-	if len(client.calls) != 3 {
-		t.Fatalf("calls = %d, want read, idempotent mutation, and confirm", len(client.calls))
+	if len(client.calls) != 1 {
+		t.Fatalf("calls = %d, want read only", len(client.calls))
 	}
 }
 
@@ -99,6 +97,47 @@ func TestIssueClaimerDoesNotMutateObservedOtherAssignee(t *testing.T) {
 	}
 	if len(client.calls) != 1 || strings.Contains(client.calls[0].query, "issueUpdate") {
 		t.Fatalf("calls = %+v, want read only and no mutation", client.calls)
+	}
+}
+
+func TestIssueClaimerDelegateClaimPreservesHumanAssignee(t *testing.T) {
+	human := &IssueUser{ID: "user-human", Name: "David"}
+	confirmed := candidateNodeWithAssignee("HAD-1", human, "owner:hermes")
+	confirmed.Delegate = &IssueUser{ID: "user-hermes", Name: "Hermes"}
+	client := &claimFakeClient{
+		responses: []any{
+			claimConfirmPayload(candidateNodeWithAssignee("HAD-1", human, "owner:hermes")),
+			claimMutationPayload(true),
+			claimConfirmPayload(confirmed),
+		},
+	}
+	claimer := IssueClaimer{Client: client}
+
+	outcome, err := claimer.ClaimIssue(context.Background(), CandidateIssue{
+		ID:         "issue-1",
+		Identifier: "HAD-1",
+		Assignee:   human,
+	}, ClaimOptions{SelfUserID: "user-hermes", Target: "delegate"})
+	if err != nil {
+		t.Fatalf("claim issue: %v", err)
+	}
+	if outcome.Code != ClaimOutcomeWin || !outcome.Dispatchable {
+		t.Fatalf("outcome = %+v, want delegate win", outcome)
+	}
+	if outcome.ConfirmedIssue == nil || outcome.ConfirmedIssue.Assignee == nil || outcome.ConfirmedIssue.Assignee.ID != "user-human" {
+		t.Fatalf("human assignee was not preserved: %+v", outcome.ConfirmedIssue)
+	}
+	if outcome.ConfirmedIssue.Delegate == nil || outcome.ConfirmedIssue.Delegate.ID != "user-hermes" {
+		t.Fatalf("delegate was not confirmed: %+v", outcome.ConfirmedIssue)
+	}
+	if outcome.ConfirmedAssignee == nil || outcome.ConfirmedAssignee.ID != "user-hermes" {
+		t.Fatalf("confirmed claim user = %+v, want delegate", outcome.ConfirmedAssignee)
+	}
+	if len(client.calls) != 3 {
+		t.Fatalf("calls = %d, want read, mutation, and confirm", len(client.calls))
+	}
+	if client.calls[1].variables["assigneeId"] != "user-hermes" {
+		t.Fatalf("mutation variables = %#v", client.calls[1].variables)
 	}
 }
 
@@ -379,6 +418,7 @@ func TestLiveLinearClaimIntegrationRequiresExplicitEnv(t *testing.T) {
 	}
 	outcome, err := (IssueClaimer{Client: client}).ClaimIssue(context.Background(), CandidateIssue{ID: issueID}, ClaimOptions{
 		SelfUserID: selfUserID,
+		Target:     os.Getenv("SYMPHONY_LINEAR_CLAIM_TARGET"),
 	})
 	if err != nil {
 		t.Fatalf("live claim: %v", err)

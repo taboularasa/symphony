@@ -36,6 +36,7 @@ type CandidateIssue struct {
 	Project    IssueProject
 	State      IssueState
 	Assignee   *IssueUser
+	Delegate   *IssueUser
 	Labels     []IssueLabel
 	Owner      OwnerLabelState
 }
@@ -193,6 +194,7 @@ type candidateIssueNode struct {
 	Project    IssueProject `json:"project"`
 	State      IssueState   `json:"state"`
 	Assignee   *IssueUser   `json:"assignee"`
+	Delegate   *IssueUser   `json:"delegate"`
 	Labels     struct {
 		Nodes []IssueLabel `json:"nodes"`
 	} `json:"labels"`
@@ -215,6 +217,7 @@ func (n candidateIssueNode) toCandidateIssue(expectedOwnerLabel string) (Candida
 		Project:    normalizeProject(n.Project),
 		State:      normalizeState(n.State),
 		Assignee:   normalizeUser(n.Assignee),
+		Delegate:   normalizeUser(n.Delegate),
 		Labels:     labels,
 		Owner:      normalizeOwnerState(labels, expectedOwnerLabel),
 	}, nil
@@ -330,6 +333,11 @@ query SymphonyLinearCandidateIssues($projectSlug: String!, $stateNames: [String!
         name
         email
       }
+      delegate {
+        id
+        name
+        email
+      }
       labels(first: $relationFirst, includeArchived: false) {
         nodes {
           id
@@ -368,6 +376,11 @@ query SymphonyLinearCandidateIssues($projectSlug: String!, $stateNames: [String!
         type
       }
       assignee {
+        id
+        name
+        email
+      }
+      delegate {
         id
         name
         email

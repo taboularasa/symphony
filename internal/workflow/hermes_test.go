@@ -37,6 +37,9 @@ func TestHermesWorkflowFileContract(t *testing.T) {
 	if config.ProjectSlug != "6a6a965c3d10" {
 		t.Fatalf("project slug = %q, want 6a6a965c3d10", config.ProjectSlug)
 	}
+	if config.ClaimTarget != ClaimTargetDelegate {
+		t.Fatalf("claim target = %q, want %q", config.ClaimTarget, ClaimTargetDelegate)
+	}
 	if got, want := strings.Join(config.ActiveStates, ","), "Todo,In Progress"; got != want {
 		t.Fatalf("active states = %q, want %q", got, want)
 	}
@@ -83,6 +86,10 @@ func TestHermesWorkflowFileContract(t *testing.T) {
 	if got := requireString(t, rollback, "legacy_gateway_unit"); got != "hermes-gateway.service" {
 		t.Fatalf("legacy gateway unit = %q, want hermes-gateway.service", got)
 	}
+	trackerConfig := requireMap(t, def.Config, "tracker")
+	if got := requireString(t, trackerConfig, "claim_target"); got != "delegate" {
+		t.Fatalf("claim target = %q, want delegate", got)
+	}
 
 	hooks := requireMap(t, def.Config, "hooks")
 	if got := requireInt(t, hooks, "timeout_ms"); got != 60000 {
@@ -102,6 +109,7 @@ func TestHermesWorkflowFileContract(t *testing.T) {
 		"Hermes Execution Manager",
 		"owner:hermes",
 		"hermes",
+		"delegate",
 		"ctx-managed worktree",
 		"Do not create a nested Hermes worktree",
 		"native Slack Socket Mode",
@@ -139,7 +147,7 @@ func TestHermesWorkflowPromptGuardrailSnapshot(t *testing.T) {
 
 	requiredGuardrails := map[string]string{
 		"owner label only":         "positive owner-label rule, not a project-name denial list.",
-		"claim gate":               "do not launch implementation work unless the claim result is",
+		"claim gate":               "expected delegate identity",
 		"delegation uniqueness":    "spawning duplicate work for the same issue",
 		"ctx source of truth":      "Use the ctx-managed worktree as the source of truth",
 		"native Slack boundary":    "Hermes Slack on this host stays in native Slack Socket Mode",
@@ -294,6 +302,7 @@ func ExampleTrackerConfig_ValidateOwnerClaimContract() {
 	settings, _ := DecodeSettings([]byte(`tracker:
   owner_label: owner:hermes
   claim_assignee: hermes
+  claim_target: delegate
   require_claim_before_dispatch: true
 `))
 	err := settings.Tracker.ValidateOwnerClaimContract("owner:hermes", "hermes", true)

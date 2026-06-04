@@ -45,6 +45,7 @@ tracker:
   project_slug: 6a6a965c3d10
   owner_label: "owner:hermes"
   claim_assignee: "hermes"
+  claim_target: "delegate"
   require_claim_before_dispatch: true
   active_states: ["Todo", "In Progress"]
   terminal_states: ["Done", "Canceled", "Cancelled", "Duplicate"]
@@ -65,10 +66,13 @@ that owner.
 
 When `require_claim_before_dispatch: true`, `claim_assignee` must resolve to one
 active Linear user. The resolver supports `me`, a Linear UUID, email, `name`, or
-`displayName`. Before launch, Symphony reads the current issue, assigns
-unassigned or self-assigned issues with `issueUpdate(... assigneeId ...)`,
-re-fetches the issue, and proceeds only when the confirmed assignee ID is self.
-Terminal-state handling does not automatically unset the Linear assignee.
+`displayName`. `claim_target` defaults to `assignee` for human-style bot users.
+For Linear OAuth app actors such as Hermes, set `claim_target: delegate` so
+Symphony preserves the human assignee and confirms the Linear `delegate` field
+instead. Before launch, Symphony reads the current issue, claims it through
+`issueUpdate`, re-fetches the issue, and proceeds only when the configured target
+field confirms self. Terminal-state handling does not automatically unset the
+Linear assignee or delegate.
 
 Claim outcomes use stable reason codes:
 
@@ -122,6 +126,7 @@ tracker:
   project_slug: 6a6a965c3d10
   owner_label: "owner:hermes"
   claim_assignee: "hermes"
+  claim_target: "delegate"
   require_claim_before_dispatch: true
 migration:
   legacy_loop_mode: disabled

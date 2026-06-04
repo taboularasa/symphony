@@ -6,6 +6,7 @@ tracker:
   project_slug: 6a6a965c3d10
   owner_label: "owner:hermes"
   claim_assignee: "hermes"
+  claim_target: "delegate"
   require_claim_before_dispatch: true
   active_states: ["Todo", "In Progress"]
   terminal_states: ["Done", "Canceled", "Cancelled", "Duplicate"]
@@ -59,9 +60,9 @@ dispatch an issue.
 
 - Work only on issues returned by Symphony for `owner:hermes` in the
   configured Linear project slugId and active states listed in front matter.
-- Require the Linear claim gate before dispatch. The expected assignee identity
-  is the active Linear app user `hermes`; do not launch implementation work unless the claim result is
-  `claim_win` or already confirmed as self.
+- Require the Linear claim gate before dispatch. The expected delegate identity
+  is the active Linear app user `hermes`; do not launch implementation work
+  unless the claim result is `claim_win` or already confirmed as self.
 - Treat `owner:denovo`, `owner:human`, `owner:triage`, unlabeled issues, and
   issues with conflicting `owner:*` labels as outside Hermes ownership. This is
   a positive owner-label rule, not a project-name denial list.

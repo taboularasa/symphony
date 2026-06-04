@@ -35,6 +35,7 @@ tracker:
   project_slug: shared-agents
   owner_label: " OWNER:Hermes "
   claim_assignee: " hermes-bot "
+  claim_target: " delegate "
   require_claim_before_dispatch: true
 ---
 Run Hermes work.
@@ -49,6 +50,9 @@ Run Hermes work.
 	if got, want := tracker.NormalizedClaimAssignee(), "hermes-bot"; got != want {
 		t.Fatalf("claim assignee = %q, want %q", got, want)
 	}
+	if got, want := tracker.NormalizedClaimTarget(), ClaimTargetDelegate; got != want {
+		t.Fatalf("claim target = %q, want %q", got, want)
+	}
 }
 
 func TestResolveLinearConfigValidHermesAndDeNovoExamples(t *testing.T) {
@@ -60,6 +64,7 @@ func TestResolveLinearConfigValidHermesAndDeNovoExamples(t *testing.T) {
 		yaml       string
 		wantOwner  string
 		wantClaim  string
+		wantTarget string
 		wantUserID string
 		wantToken  string
 	}{
@@ -71,10 +76,12 @@ func TestResolveLinearConfigValidHermesAndDeNovoExamples(t *testing.T) {
   project_slug: symphony
   owner_label: " OWNER:Hermes "
   claim_assignee: " hermes-bot "
+  claim_target: delegate
   require_claim_before_dispatch: true
 `,
 			wantOwner:  "owner:hermes",
 			wantClaim:  "hermes-bot",
+			wantTarget: ClaimTargetDelegate,
 			wantUserID: "user-hermes",
 			wantToken:  "hermes-token",
 		},
@@ -89,6 +96,7 @@ func TestResolveLinearConfigValidHermesAndDeNovoExamples(t *testing.T) {
 `,
 			wantOwner:  "owner:denovo",
 			wantClaim:  "denovo-bot",
+			wantTarget: ClaimTargetAssignee,
 			wantUserID: "user-denovo",
 			wantToken:  "fallback-token",
 		},
@@ -121,6 +129,9 @@ func TestResolveLinearConfigValidHermesAndDeNovoExamples(t *testing.T) {
 			}
 			if config.ClaimAssigneeID != tt.wantUserID {
 				t.Fatalf("claim user id = %q, want %q", config.ClaimAssigneeID, tt.wantUserID)
+			}
+			if config.ClaimTarget != tt.wantTarget {
+				t.Fatalf("claim target = %q, want %q", config.ClaimTarget, tt.wantTarget)
 			}
 			if config.APIKey != tt.wantToken {
 				t.Fatalf("resolved api key = %q, want %q", config.APIKey, tt.wantToken)
@@ -206,6 +217,11 @@ func TestParseWorkflowRejectsBadClaimGate(t *testing.T) {
 			name: "claim map",
 			yaml: "claim_assignee: {name: hermes-bot}\n",
 			want: "expected string or null",
+		},
+		{
+			name: "bad claim target",
+			yaml: "claim_target: comment\n",
+			want: `tracker.claim_target must be "assignee" or "delegate"`,
 		},
 	}
 	for _, tt := range tests {

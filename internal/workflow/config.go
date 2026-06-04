@@ -19,6 +19,11 @@ const DefaultLinearEndpoint = "https://api.linear.app/graphql"
 
 var envRefPattern = regexp.MustCompile(`^\$[A-Za-z_][A-Za-z0-9_]*$`)
 
+const (
+	ClaimTargetAssignee = "assignee"
+	ClaimTargetDelegate = "delegate"
+)
+
 type Definition struct {
 	Config         map[string]any
 	Prompt         string
@@ -39,6 +44,7 @@ type TrackerConfig struct {
 	ProjectSlug                string         `yaml:"project_slug"`
 	OwnerLabel                 OptionalString `yaml:"owner_label"`
 	ClaimAssignee              OptionalString `yaml:"claim_assignee"`
+	ClaimTarget                string         `yaml:"claim_target"`
 	RequireClaimBeforeDispatch bool           `yaml:"require_claim_before_dispatch"`
 	ActiveStates               []string       `yaml:"active_states"`
 	TerminalStates             []string       `yaml:"terminal_states"`
@@ -51,6 +57,7 @@ type LinearConfig struct {
 	OwnerLabel                 string
 	ClaimAssignee              string
 	ClaimAssigneeID            string
+	ClaimTarget                string
 	RequireClaimBeforeDispatch bool
 	ActiveStates               []string
 	TerminalStates             []string
@@ -192,6 +199,9 @@ func (t TrackerConfig) Validate() error {
 	if err := validateOptionalClaimAssignee(t.ClaimAssignee); err != nil {
 		return err
 	}
+	if err := validateClaimTarget(t.ClaimTarget); err != nil {
+		return err
+	}
 	if t.RequireClaimBeforeDispatch && !t.ClaimAssignee.Enabled() {
 		return errors.New("tracker.require_claim_before_dispatch requires tracker.claim_assignee")
 	}
@@ -240,6 +250,7 @@ func (t TrackerConfig) ResolveLinearConfig(ctx context.Context, resolver ClaimAs
 		ProjectSlug:                projectSlug,
 		OwnerLabel:                 t.NormalizedOwnerLabel(),
 		ClaimAssignee:              t.NormalizedClaimAssignee(),
+		ClaimTarget:                t.NormalizedClaimTarget(),
 		RequireClaimBeforeDispatch: t.RequireClaimBeforeDispatch,
 		ActiveStates:               append([]string(nil), t.ActiveStates...),
 		TerminalStates:             append([]string(nil), t.TerminalStates...),
@@ -303,6 +314,14 @@ func (t TrackerConfig) NormalizedClaimAssignee() string {
 	return strings.TrimSpace(t.ClaimAssignee.Value)
 }
 
+func (t TrackerConfig) NormalizedClaimTarget() string {
+	target := strings.ToLower(strings.TrimSpace(t.ClaimTarget))
+	if target == "" {
+		return ClaimTargetAssignee
+	}
+	return target
+}
+
 func defaultSettings() Settings {
 	return Settings{
 		Tracker: TrackerConfig{
@@ -348,6 +367,15 @@ func validateOptionalClaimAssignee(assignee OptionalString) error {
 		return errors.New("tracker.claim_assignee must not be blank")
 	}
 	return nil
+}
+
+func validateClaimTarget(target string) error {
+	switch strings.ToLower(strings.TrimSpace(target)) {
+	case "", ClaimTargetAssignee, ClaimTargetDelegate:
+		return nil
+	default:
+		return fmt.Errorf("tracker.claim_target must be %q or %q", ClaimTargetAssignee, ClaimTargetDelegate)
+	}
 }
 
 func normalizeOwnerLabel(value string) string {

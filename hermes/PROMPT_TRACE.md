@@ -24,7 +24,8 @@ policy from generic Hermes runtime prompt machinery.
 ## Migrated Guardrails
 
 - Hermes acts only on Symphony-returned Linear issues with `owner:hermes`.
-- Dispatch requires the `hermes` Linear app-user claim gate to win or confirm self.
+- Dispatch requires the `hermes` Linear app-user delegate claim gate to win or
+  confirm self.
 - `owner:denovo`, `owner:human`, `owner:triage`, unlabeled issues, and
   conflicting owner labels are excluded by positive label selection, not
   project-name negative lists.

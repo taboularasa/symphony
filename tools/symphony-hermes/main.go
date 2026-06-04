@@ -36,6 +36,7 @@ type runner struct {
 	dryRun      bool
 	checkHook   bool
 	limit       int
+	issueFilter string
 	claimAgents []string
 }
 
@@ -58,6 +59,7 @@ func run(args []string, out io.Writer) error {
 	interval := fs.Duration("interval", 30*time.Second, "poll interval when not using --once")
 	timeout := fs.Duration("timeout", 2*time.Minute, "timeout for one polling cycle")
 	limit := fs.Int("limit", 10, "maximum candidates to inspect per cycle")
+	issueFilter := fs.String("issue", "", "only inspect a matching Linear issue identifier, id, or URL")
 	agentIDs := fs.String("agent-user-ids", "", "comma-separated Linear user IDs treated as peer agents for claim-loss classification")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -78,6 +80,9 @@ func run(args []string, out io.Writer) error {
 	}
 	if err := def.Settings.Tracker.ValidateOwnerClaimContract("owner:hermes", "hermes", true); err != nil {
 		return fmt.Errorf("Hermes workflow contract: %w", err)
+	}
+	if target := def.Settings.Tracker.NormalizedClaimTarget(); target != workflow.ClaimTargetDelegate {
+		return fmt.Errorf("Hermes workflow contract: tracker.claim_target must be %q", workflow.ClaimTargetDelegate)
 	}
 
 	token, err := resolveTrackerToken(def.Settings.Tracker, *allowTokenFallback)
@@ -100,11 +105,13 @@ func run(args []string, out io.Writer) error {
 		"owner_label":                   linearConfig.OwnerLabel,
 		"claim_assignee":                linearConfig.ClaimAssignee,
 		"claim_assignee_id":             linearConfig.ClaimAssigneeID,
+		"claim_target":                  linearConfig.ClaimTarget,
 		"require_claim_before_dispatch": linearConfig.RequireClaimBeforeDispatch,
 		"token_source":                  token.Source,
 		"token_fallback":                token.Fallback,
 		"missing_token_env":             token.MissingEnv,
 		"dry_run":                       *dryRun,
+		"issue_filter":                  strings.TrimSpace(*issueFilter),
 	}); err != nil {
 		return err
 	}
@@ -118,6 +125,7 @@ func run(args []string, out io.Writer) error {
 		dryRun:      *dryRun,
 		checkHook:   *checkHook,
 		limit:       *limit,
+		issueFilter: strings.TrimSpace(*issueFilter),
 		claimAgents: normalizeCSV(*agentIDs),
 	}
 	if *once {
@@ -157,12 +165,16 @@ func (r runner) runOnce(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	fetchedCandidateCount := len(candidates)
+	candidates = filterCandidatesForIssue(candidates, r.issueFilter)
 	if err := emit(r.out, "candidate_poll", map[string]any{
-		"project_slug":    r.linear.ProjectSlug,
-		"owner_label":     r.linear.OwnerLabel,
-		"active_states":   r.linear.ActiveStates,
-		"candidate_count": len(candidates),
-		"dry_run":         r.dryRun,
+		"project_slug":            r.linear.ProjectSlug,
+		"owner_label":             r.linear.OwnerLabel,
+		"active_states":           r.linear.ActiveStates,
+		"candidate_count":         len(candidates),
+		"fetched_candidate_count": fetchedCandidateCount,
+		"issue_filter":            strings.TrimSpace(r.issueFilter),
+		"dry_run":                 r.dryRun,
 	}); err != nil {
 		return err
 	}
@@ -221,6 +233,35 @@ func (r runner) dryRunDecision(candidate linear.CandidateIssue) (string, bool) {
 	}
 }
 
+func filterCandidatesForIssue(candidates []linear.CandidateIssue, issueFilter string) []linear.CandidateIssue {
+	issueFilter = strings.TrimSpace(issueFilter)
+	if issueFilter == "" {
+		return candidates
+	}
+	filtered := make([]linear.CandidateIssue, 0, len(candidates))
+	for _, candidate := range candidates {
+		if candidateMatchesIssueFilter(candidate, issueFilter) {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered
+}
+
+func candidateMatchesIssueFilter(candidate linear.CandidateIssue, issueFilter string) bool {
+	filter := strings.ToLower(strings.TrimSpace(issueFilter))
+	if filter == "" {
+		return true
+	}
+	identifier := strings.ToLower(strings.TrimSpace(candidate.Identifier))
+	id := strings.ToLower(strings.TrimSpace(candidate.ID))
+	url := strings.ToLower(strings.TrimSpace(candidate.URL))
+	return filter == identifier ||
+		filter == id ||
+		strings.Contains(filter, "/issue/"+identifier+"/") ||
+		strings.HasSuffix(filter, "/issue/"+identifier) ||
+		url == filter
+}
+
 func (r runner) dispatchPolicy() linear.DispatchPolicy {
 	agentIDs := append([]string{r.linear.ClaimAssigneeID}, r.claimAgents...)
 	return linear.DispatchPolicy{
@@ -231,6 +272,7 @@ func (r runner) dispatchPolicy() linear.DispatchPolicy {
 		Claim: linear.ClaimOptions{
 			SelfUserID:   r.linear.ClaimAssigneeID,
 			AgentUserIDs: agentIDs,
+			Target:       r.linear.ClaimTarget,
 		},
 	}
 }
@@ -273,6 +315,7 @@ func resolveLinearConfig(ctx context.Context, tracker workflow.TrackerConfig, cl
 		ProjectSlug:                projectSlug,
 		OwnerLabel:                 tracker.NormalizedOwnerLabel(),
 		ClaimAssignee:              tracker.NormalizedClaimAssignee(),
+		ClaimTarget:                tracker.NormalizedClaimTarget(),
 		RequireClaimBeforeDispatch: tracker.RequireClaimBeforeDispatch,
 		ActiveStates:               append([]string(nil), tracker.ActiveStates...),
 		TerminalStates:             append([]string(nil), tracker.TerminalStates...),
@@ -352,12 +395,29 @@ func decisionFields(issue linear.CandidateIssue, code string, dispatchable bool,
 			fields["assignee_name"] = assigneeName
 		}
 	}
+	if issue.Delegate != nil {
+		fields["delegate_id"] = issue.Delegate.ID
+		delegateName := strings.TrimSpace(issue.Delegate.Name)
+		if delegateName != "" {
+			fields["delegate_name"] = delegateName
+		}
+	}
 	if outcome != nil {
 		fields["claim_code"] = outcome.Code
 		fields["claim_retryable"] = outcome.Retryable
+		if outcome.ConfirmedIssue != nil {
+			if outcome.ConfirmedIssue.Assignee != nil {
+				fields["confirmed_assignee_id"] = outcome.ConfirmedIssue.Assignee.ID
+				fields["confirmed_assignee_name"] = outcome.ConfirmedIssue.Assignee.Name
+			}
+			if outcome.ConfirmedIssue.Delegate != nil {
+				fields["confirmed_delegate_id"] = outcome.ConfirmedIssue.Delegate.ID
+				fields["confirmed_delegate_name"] = outcome.ConfirmedIssue.Delegate.Name
+			}
+		}
 		if outcome.ConfirmedAssignee != nil {
-			fields["confirmed_assignee_id"] = outcome.ConfirmedAssignee.ID
-			fields["confirmed_assignee_name"] = outcome.ConfirmedAssignee.Name
+			fields["confirmed_claim_user_id"] = outcome.ConfirmedAssignee.ID
+			fields["confirmed_claim_user_name"] = outcome.ConfirmedAssignee.Name
 		}
 	}
 	return fields

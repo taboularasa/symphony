@@ -123,14 +123,57 @@ func TestRunCheckHookEmitsHookResult(t *testing.T) {
 	}
 }
 
-func TestDryRunDecisionPreservesHumanClaimLoss(t *testing.T) {
+func TestDryRunDecisionWouldClaimHumanAssignedIssueInDelegateMode(t *testing.T) {
 	r := runner{linear: workflowLinearConfigForTest()}
 	code, dispatchable := r.dryRunDecision(linearCandidateForTest("HAD-2", &issueUserForTest{
 		ID:   "user-human",
 		Name: "David",
 	}))
-	if code != "claim_loss_human" || dispatchable {
-		t.Fatalf("dry-run decision = %s dispatchable=%v, want human claim loss", code, dispatchable)
+	if code != "dry_run_would_claim" || dispatchable {
+		t.Fatalf("dry-run decision = %s dispatchable=%v, want delegate claim preview", code, dispatchable)
+	}
+}
+
+func TestDryRunDecisionAllowsExistingDelegateClaim(t *testing.T) {
+	r := runner{linear: workflowLinearConfigForTest()}
+	candidate := linearCandidateForTest("HAD-3", &issueUserForTest{ID: "user-human", Name: "David"})
+	candidate.Delegate = &linear.IssueUser{ID: "user-hermes", Name: "Hermes"}
+	code, dispatchable := r.dryRunDecision(candidate)
+	if code != "dry_run_would_dispatch" || !dispatchable {
+		t.Fatalf("dry-run decision = %s dispatchable=%v, want dispatch preview", code, dispatchable)
+	}
+}
+
+func TestFilterCandidatesForIssueMatchesIdentifierIDAndURL(t *testing.T) {
+	candidates := []linear.CandidateIssue{
+		{
+			ID:         "issue-uuid-1",
+			Identifier: "HAD-1",
+			URL:        "https://linear.app/hadto/issue/HAD-1/first",
+		},
+		{
+			ID:         "issue-uuid-2",
+			Identifier: "HAD-2",
+			URL:        "https://linear.app/hadto/issue/HAD-2/second",
+		},
+	}
+	for _, tt := range []struct {
+		name        string
+		issueFilter string
+		want        []string
+	}{
+		{name: "empty", issueFilter: "", want: []string{"HAD-1", "HAD-2"}},
+		{name: "identifier", issueFilter: "had-2", want: []string{"HAD-2"}},
+		{name: "id", issueFilter: "issue-uuid-1", want: []string{"HAD-1"}},
+		{name: "url", issueFilter: "https://linear.app/hadto/issue/HAD-2/second", want: []string{"HAD-2"}},
+		{name: "missing", issueFilter: "HAD-3", want: nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := filterCandidatesForIssue(candidates, tt.issueFilter)
+			if identifiers(got) != strings.Join(tt.want, ",") {
+				t.Fatalf("filtered identifiers = %q, want %v", identifiers(got), tt.want)
+			}
+		})
 	}
 }
 
@@ -150,6 +193,7 @@ tracker:
   project_slug: 6a6a965c3d10
   owner_label: "owner:hermes"
   claim_assignee: "hermes"
+  claim_target: "delegate"
   require_claim_before_dispatch: true
   active_states: ["Todo", "In Progress"]
   terminal_states: ["Done", "Canceled", "Cancelled", "Duplicate"]
@@ -228,6 +272,7 @@ func workflowLinearConfigForTest() workflow.LinearConfig {
 		ProjectSlug:                "6a6a965c3d10",
 		OwnerLabel:                 "owner:hermes",
 		ClaimAssigneeID:            "user-hermes",
+		ClaimTarget:                "delegate",
 		RequireClaimBeforeDispatch: true,
 		ActiveStates:               []string{"Todo", "In Progress"},
 		TerminalStates:             []string{"Done", "Canceled"},
@@ -247,4 +292,12 @@ func linearCandidateForTest(identifier string, assignee *issueUserForTest) linea
 		Assignee:   linearAssignee,
 		Labels:     []linear.IssueLabel{{Name: "owner:hermes"}},
 	}
+}
+
+func identifiers(candidates []linear.CandidateIssue) string {
+	values := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		values = append(values, candidate.Identifier)
+	}
+	return strings.Join(values, ",")
 }
