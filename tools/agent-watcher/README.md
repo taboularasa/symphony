@@ -99,6 +99,18 @@ Slack needs `chat:write` for the bot token, and the bot must be a member of
 from the Phase 1 substrate when available; if that identity is deferred, record
 the temporary token owner in the deployment proof.
 
+Hadto live substrate refresh on 2026-06-04:
+
+- `#agents-bridge` exists as `C0B83H1F15K`.
+- The Hermes Slack bot authenticates as `hermes` and is a member of that channel.
+- `#hermes-ops` and `#denovo-ops` still require a Slack token with
+  `channels:manage`; the current bot token returns `missing_scope` for channel
+  creation.
+- `HERMES_LINEAR_TOKEN`, `DENOVO_LINEAR_TOKEN`, and `WATCHER_LINEAR_TOKEN` are
+  still absent from Doppler `lenovo_server/dev`; live Linear comment proof should
+  wait for the watcher identity decision or explicitly document fallback token
+  ownership.
+
 ## user-systemd
 
 Example unit:

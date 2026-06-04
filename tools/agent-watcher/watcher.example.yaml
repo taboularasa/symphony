@@ -21,7 +21,7 @@ rate_limits:
   actor_writes_per_minute: 30
 
 alerts:
-  slack_channel_id: "CAGENTSBRIDGE"
+  slack_channel_id: "C0B83H1F15K"
   human_mention: "@david"
 
 webhook:
