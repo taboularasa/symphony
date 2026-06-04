@@ -59,6 +59,37 @@ go run ./tools/github-owner-check \
 The deny command intentionally exits nonzero after printing a JSON decision.
 That is the behavior the required check needs.
 
+To preserve local proof without committing generated output, write sanitized
+JSON decisions under the ignored `build/github-owner-backstop/` directory:
+
+```bash
+mkdir -p build/github-owner-backstop
+
+go run ./tools/github-owner-check \
+  --repository taboularasa/de-novo \
+  --branch HAD-665/github-backstop \
+  --head-sha local-allow-proof \
+  --owner-label owner:denovo \
+  --event-sender-login 'denovo-bot[bot]' \
+  --event-sender-type Bot \
+  --linear-token-env '' \
+  > build/github-owner-backstop/allow-denovo-app.json
+
+set +e
+go run ./tools/github-owner-check \
+  --repository taboularasa/de-novo \
+  --branch HAD-665/github-backstop \
+  --head-sha local-deny-proof \
+  --owner-label owner:denovo \
+  --event-sender-login 'hermes-bot[bot]' \
+  --event-sender-type Bot \
+  --linear-token-env '' \
+  > build/github-owner-backstop/deny-cross-owner-app.json
+deny_status=$?
+set -e
+test "$deny_status" -ne 0
+```
+
 When `--owner-label` is omitted and `--linear-token-env` names a populated token
 env var, the command resolves the Linear issue key from `--linear-issue`,
 `--branch`, or the PR body and reads the issue's `owner:*` label from Linear.

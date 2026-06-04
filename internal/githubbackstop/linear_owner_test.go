@@ -53,6 +53,19 @@ func TestOwnerResolverReportsOwnerConflicts(t *testing.T) {
 	}
 }
 
+func TestOwnerResolverReportsMissingOwnerLabel(t *testing.T) {
+	resolver := OwnerResolver{Client: fakeLinearOwnerClient{response: ownerIssueResponse{
+		Issue: ownerIssue("HAD-665", "bug", "customer"),
+	}}}
+	resolution, err := resolver.ResolveOwnerLabel(context.Background(), "HAD-665")
+	if err != nil {
+		t.Fatalf("ResolveOwnerLabel() error = %v", err)
+	}
+	if resolution.OwnerLabel != "" || resolution.ConflictReason != ReasonOwnerLabelMissing {
+		t.Fatalf("resolution = %#v, want missing owner label", resolution)
+	}
+}
+
 func TestOwnerResolverRequiresIdentifier(t *testing.T) {
 	resolver := OwnerResolver{Client: fakeLinearOwnerClient{response: ownerIssueResponse{
 		Issue: ownerIssue("", "owner:denovo"),

@@ -54,6 +54,17 @@ func TestEvaluateAllowsExpectedAppsAndDeniesCrossOwnerApps(t *testing.T) {
 			status: DecisionDeny,
 			reason: ReasonActorNotAllowed,
 		},
+		{
+			name: "unknown app to denovo issue",
+			input: CheckInput{
+				Repository:     "taboularasa/de-novo",
+				LinearIssueKey: "HAD-665",
+				OwnerLabel:     "owner:denovo",
+				Actor:          ActorIdentity{Login: "unknown-bot[bot]", Type: "Bot"},
+			},
+			status: DecisionDeny,
+			reason: ReasonActorNotAllowed,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -176,6 +187,30 @@ func TestEvaluateDeniesStaleAppID(t *testing.T) {
 	})
 	if decision.Status != DecisionDeny || decision.ReasonCode != ReasonActorAppIDMismatch {
 		t.Fatalf("Evaluate() = %#v, want app id mismatch", decision)
+	}
+}
+
+func TestEvaluateDeniesHumanWhenBypassUnavailable(t *testing.T) {
+	policy := Policy{
+		SchemaVersion: PolicySchemaVersion,
+		Owners: []OwnerPolicy{
+			{
+				OwnerLabel:          "owner:denovo",
+				AllowedRepositories: []string{"taboularasa/de-novo"},
+				ExpectedApps: []AppIdentity{
+					{Slug: "denovo-bot", Login: "denovo-bot[bot]", AppID: "123"},
+				},
+			},
+		},
+	}
+	decision := Evaluate(policy, CheckInput{
+		Repository:     "taboularasa/de-novo",
+		LinearIssueKey: "HAD-665",
+		OwnerLabel:     "owner:denovo",
+		Actor:          ActorIdentity{Login: "taboularasa", Type: "User", RepoAdmin: true},
+	})
+	if decision.Status != DecisionDeny || decision.ReasonCode != ReasonHumanBypassUnavailable {
+		t.Fatalf("Evaluate() = %#v, want human bypass unavailable", decision)
 	}
 }
 
