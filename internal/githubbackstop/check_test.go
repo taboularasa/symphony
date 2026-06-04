@@ -116,7 +116,7 @@ func TestEvaluateDeniesRepositoryAndOwnershipProblems(t *testing.T) {
 			input: CheckInput{
 				Repository:     "taboularasa/de-novo",
 				LinearIssueKey: "HAD-665",
-				OwnerLabel:     "owner:triage",
+				OwnerLabel:     "owner:unknown",
 				Actor:          ActorIdentity{Login: "denovo-bot[bot]", Type: "Bot"},
 			},
 			reason: ReasonOwnerPolicyMissing,
@@ -162,6 +162,19 @@ func TestEvaluateHumanBypass(t *testing.T) {
 	})
 	if denied.Status != DecisionDeny || denied.ReasonCode != ReasonActorNotAllowed {
 		t.Fatalf("Evaluate(non-admin) = %#v, want actor_not_allowed", denied)
+	}
+}
+
+func TestEvaluateAllowsHumanOwnedSymphonyAdminBypass(t *testing.T) {
+	policy := testPolicy(t)
+	decision := Evaluate(policy, CheckInput{
+		Repository:     "taboularasa/symphony",
+		LinearIssueKey: "HAD-666",
+		OwnerLabel:     "owner:human",
+		Actor:          ActorIdentity{Login: "taboularasa", Type: "User", RepoAdmin: true},
+	})
+	if decision.Status != DecisionAllow || decision.ReasonCode != ReasonHumanBypass {
+		t.Fatalf("Evaluate() = %#v, want human bypass allow", decision)
 	}
 }
 

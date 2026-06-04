@@ -42,4 +42,5 @@ jobs:
             --pr-author-type '${{ github.event.pull_request.user.type || '' }}' \
             --event-sender-login '${{ github.event.sender.login || github.actor }}' \
             --event-sender-type '${{ github.event.sender.type || '' }}' \
+            --actor-repo-admin '${{ github.event.sender.login == github.repository_owner }}' \
             --linear-token-env LINEAR_API_KEY

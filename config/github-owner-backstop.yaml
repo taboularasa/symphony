@@ -18,6 +18,19 @@ owners:
         login: denovo-bot[bot]
         app_id_env: DENOVO_GITHUB_APP_ID
 
+  - owner_label: owner:human
+    allowed_repositories:
+      - taboularasa/symphony
+    expected_apps: []
+
+  - owner_label: owner:triage
+    allowed_repositories:
+      - taboularasa/symphony
+    expected_apps: []
+
+shared_repositories:
+  - taboularasa/symphony
+
 human_bypass:
   mode: repo_admin_only
   allowed_logins: []

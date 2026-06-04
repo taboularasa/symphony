@@ -120,7 +120,7 @@ func (p Policy) Validate() error {
 			repoOwners[normalized] = ownerLabel
 		}
 
-		if len(owner.ExpectedApps) == 0 {
+		if len(owner.ExpectedApps) == 0 && !humanOnlyOwner(ownerLabel) {
 			errs = append(errs, prefix+".expected_apps must not be empty")
 		}
 		for j, app := range owner.ExpectedApps {
@@ -170,6 +170,15 @@ func (p Policy) OwnerForLabel(label string) (OwnerPolicy, bool) {
 		}
 	}
 	return OwnerPolicy{}, false
+}
+
+func humanOnlyOwner(ownerLabel string) bool {
+	switch normalizeOwnerLabel(ownerLabel) {
+	case "owner:human", "owner:triage":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateAppIdentity(prefix string, app AppIdentity) []string {
