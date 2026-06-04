@@ -103,6 +103,29 @@ If the dedicated Linear tokens are still absent, use of `LINEAR_API_KEY` as a
 temporary drill fallback must be named in the authorization comment and in the
 final report.
 
+Generate a machine-readable readiness packet before requesting authorization:
+
+```sh
+cd /home/david/stacks/symphony
+doppler run --project lenovo_server --config dev -- \
+  go run ./drills \
+    --plan \
+    --format json \
+    --plan-output "build/drills/$DRILL_RUN_ID-plan.json" \
+    --run-id "$DRILL_RUN_ID" \
+    --linear-parent "$PARENT_LINEAR_ID" \
+    --linear-child "$CHILD_LINEAR_ID" \
+    --slack-channel C0B83H1F15K \
+    --drill-branch "$DRILL_BRANCH" \
+    --drill-artifact "$DRILL_ARTIFACT" \
+    --drill-report "$DRILL_REPORT"
+```
+
+The packet must report `ready_to_run_live_writes: true` before executing any
+live-write command. If it reports `blocked`, copy the
+`authorization_template` into HAD-667 only after filling in the concrete
+canary IDs, time window, fallback-token decisions, and branch/PR values.
+
 ## Canary Creation
 
 Live write. Do not run before authorization.

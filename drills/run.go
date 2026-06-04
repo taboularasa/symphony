@@ -82,6 +82,8 @@ type sequenceStep struct {
 
 func main() {
 	eventsPath := flag.String("events", "", "normalized drill event JSON path, or - for stdin")
+	plan := flag.Bool("plan", false, "render a live drill readiness and authorization packet")
+	planOutput := flag.String("plan-output", "", "optional path to write the live drill readiness packet JSON")
 	collect := flag.Bool("collect", false, "collect live drill artifacts and append them to --events input")
 	collectOutput := flag.String("collect-output", "", "optional path to write the combined normalized event JSON")
 	runID := flag.String("run-id", "", "optional run id for collected output")
@@ -98,13 +100,70 @@ func main() {
 	githubTokenEnv := flag.String("github-token-env", "", "optional env var containing GitHub token for collection")
 	githubPR := flag.String("github-pr", "", "GitHub PR URL for collection")
 	githubLinearID := flag.String("github-linear-id", "", "Linear issue id/key associated with --github-pr")
+	authorizationRecorded := flag.Bool("authorization-recorded", false, "mark that explicit live-write authorization has been recorded")
+	authorizationURL := flag.String("authorization-url", "", "Linear URL for the live-write authorization comment")
+	projectSlug := flag.String("project-slug", "6a6a965c3d10", "Linear project slugId for the live drill plan")
+	targetRepo := flag.String("target-repo", "taboularasa/de-novo", "target repository for the live drill plan")
+	drillBranch := flag.String("drill-branch", "", "planned drill branch name")
+	watcherUnit := flag.String("watcher-unit", "symphony-agent-watcher-soak.service", "watcher unit name for the live drill plan")
+	drillArtifact := flag.String("drill-artifact", "", "planned normalized drill artifact path")
+	drillReport := flag.String("drill-report", "", "planned drill report JSON path")
+	hermesWorkflow := flag.String("hermes-workflow", "hermes/WORKFLOW.md", "Hermes workflow path for the live drill plan")
+	denovoWorkflow := flag.String("denovo-workflow", "/home/david/code/de-novo/denovo/WORKFLOW.md", "De Novo workflow path for the live drill plan")
 	format := flag.String("format", "text", "report format: text or json")
 	flag.Parse()
 
-	if strings.TrimSpace(*eventsPath) == "" && !*collect {
-		fmt.Fprintln(os.Stderr, "missing --events or --collect")
+	if strings.TrimSpace(*eventsPath) == "" && !*collect && !*plan {
+		fmt.Fprintln(os.Stderr, "missing --events, --collect, or --plan")
 		flag.Usage()
 		os.Exit(2)
+	}
+	if *plan {
+		packet := BuildDrillPlan(DrillPlanOptions{
+			RunID:                 *runID,
+			GeneratedAt:           time.Now().UTC(),
+			AuthorizationRecorded: *authorizationRecorded,
+			AuthorizationURL:      *authorizationURL,
+			ProjectSlug:           *projectSlug,
+			ParentLinearID:        *linearParent,
+			ChildLinearID:         *linearChild,
+			BridgeChannel:         *slackChannel,
+			TargetRepo:            *targetRepo,
+			DrillBranch:           *drillBranch,
+			DrillPRURL:            *githubPR,
+			WatcherUnit:           *watcherUnit,
+			ArtifactPath:          *drillArtifact,
+			ReportPath:            *drillReport,
+			HermesWorkflow:        *hermesWorkflow,
+			DeNovoWorkflow:        *denovoWorkflow,
+			LookupEnv:             os.LookupEnv,
+		})
+		if strings.TrimSpace(*planOutput) != "" {
+			if err := WriteDrillPlan(*planOutput, packet); err != nil {
+				fmt.Fprintf(os.Stderr, "write plan: %v\n", err)
+				os.Exit(2)
+			}
+		}
+		switch *format {
+		case "json":
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			if err := enc.Encode(packet); err != nil {
+				fmt.Fprintf(os.Stderr, "encode plan: %v\n", err)
+				os.Exit(2)
+			}
+		case "text":
+			PrintDrillPlan(os.Stdout, packet)
+		default:
+			fmt.Fprintf(os.Stderr, "unknown --format %q\n", *format)
+			os.Exit(2)
+		}
+		if packet.Status != DrillPlanStatusReady {
+			os.Exit(1)
+		}
+		if strings.TrimSpace(*eventsPath) == "" && !*collect {
+			return
+		}
 	}
 	run := DrillRun{Scenario: scenarioHandoff001, RunID: *runID}
 	if strings.TrimSpace(*eventsPath) != "" {
