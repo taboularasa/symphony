@@ -1,0 +1,45 @@
+name: github-owner-backstop
+
+on:
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+  merge_group:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-backstop:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout trusted policy code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Set up Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check owner/app repository boundary
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+        run: |
+          set -euo pipefail
+          body_file="$(mktemp)"
+          printf '%s' "$PR_BODY" > "$body_file"
+          go run ./tools/github-owner-check \
+            --repository '${{ github.repository }}' \
+            --branch '${{ github.event.pull_request.head.ref || github.event.merge_group.head_ref || github.ref_name }}' \
+            --head-sha '${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}' \
+            --pr-body-file "$body_file" \
+            --pr-author-login '${{ github.event.pull_request.user.login || github.actor }}' \
+            --pr-author-type '${{ github.event.pull_request.user.type || '' }}' \
+            --event-sender-login '${{ github.event.sender.login || github.actor }}' \
+            --event-sender-type '${{ github.event.sender.type || '' }}' \
+            --linear-token-env LINEAR_API_KEY

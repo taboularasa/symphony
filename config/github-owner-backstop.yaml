@@ -1,0 +1,23 @@
+schema_version: hadto.symphony.github-owner-backstop.v1
+
+owners:
+  - owner_label: owner:hermes
+    allowed_repositories:
+      - taboularasa/hermes-agent
+      - taboularasa/phoneitin
+    expected_apps:
+      - slug: hermes-bot
+        login: hermes-bot[bot]
+        app_id_env: HERMES_GITHUB_APP_ID
+
+  - owner_label: owner:denovo
+    allowed_repositories:
+      - taboularasa/de-novo
+    expected_apps:
+      - slug: denovo-bot
+        login: denovo-bot[bot]
+        app_id_env: DENOVO_GITHUB_APP_ID
+
+human_bypass:
+  mode: repo_admin_only
+  allowed_logins: []
