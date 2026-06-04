@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -81,23 +82,77 @@ type sequenceStep struct {
 
 func main() {
 	eventsPath := flag.String("events", "", "normalized drill event JSON path, or - for stdin")
+	collect := flag.Bool("collect", false, "collect live drill artifacts and append them to --events input")
+	collectOutput := flag.String("collect-output", "", "optional path to write the combined normalized event JSON")
+	runID := flag.String("run-id", "", "optional run id for collected output")
+	since := flag.String("since", "", "optional RFC3339 lower bound for live artifact collection")
+	until := flag.String("until", "", "optional RFC3339 upper bound for live artifact collection")
+	linearEndpoint := flag.String("linear-endpoint", "https://api.linear.app/graphql", "Linear GraphQL endpoint")
+	linearTokenEnv := flag.String("linear-token-env", "", "env var containing Linear token for collection")
+	linearParent := flag.String("linear-parent", "", "Linear parent issue id/key for collection")
+	linearChild := flag.String("linear-child", "", "Linear child issue id/key for collection")
+	slackEndpoint := flag.String("slack-endpoint", "https://slack.com/api/conversations.history", "Slack conversations.history endpoint")
+	slackTokenEnv := flag.String("slack-token-env", "", "env var containing Slack bot token for collection")
+	slackChannel := flag.String("slack-channel", "", "Slack channel id/name for collection")
+	githubAPIBase := flag.String("github-api-base", "https://api.github.com", "GitHub API base URL")
+	githubTokenEnv := flag.String("github-token-env", "", "optional env var containing GitHub token for collection")
+	githubPR := flag.String("github-pr", "", "GitHub PR URL for collection")
+	githubLinearID := flag.String("github-linear-id", "", "Linear issue id/key associated with --github-pr")
 	format := flag.String("format", "text", "report format: text or json")
 	flag.Parse()
 
-	if strings.TrimSpace(*eventsPath) == "" {
-		fmt.Fprintln(os.Stderr, "missing --events")
+	if strings.TrimSpace(*eventsPath) == "" && !*collect {
+		fmt.Fprintln(os.Stderr, "missing --events or --collect")
 		flag.Usage()
 		os.Exit(2)
 	}
-	data, err := readInput(*eventsPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "read events: %v\n", err)
-		os.Exit(2)
+	run := DrillRun{Scenario: scenarioHandoff001, RunID: *runID}
+	if strings.TrimSpace(*eventsPath) != "" {
+		data, err := readInput(*eventsPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "read events: %v\n", err)
+			os.Exit(2)
+		}
+		inputRun, err := DecodeRun(data)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "decode events: %v\n", err)
+			os.Exit(2)
+		}
+		run = mergeRuns(run, inputRun)
 	}
-	run, err := DecodeRun(data)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "decode events: %v\n", err)
-		os.Exit(2)
+	if *collect {
+		cfg, err := buildCollectConfig(collectCLIOptions{
+			runID:          *runID,
+			since:          *since,
+			until:          *until,
+			linearEndpoint: *linearEndpoint,
+			linearTokenEnv: *linearTokenEnv,
+			linearParent:   *linearParent,
+			linearChild:    *linearChild,
+			slackEndpoint:  *slackEndpoint,
+			slackTokenEnv:  *slackTokenEnv,
+			slackChannel:   *slackChannel,
+			githubAPIBase:  *githubAPIBase,
+			githubTokenEnv: *githubTokenEnv,
+			githubPR:       *githubPR,
+			githubLinearID: *githubLinearID,
+		})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "configure collection: %v\n", err)
+			os.Exit(2)
+		}
+		collected, err := CollectLiveArtifacts(context.Background(), cfg)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "collect artifacts: %v\n", err)
+			os.Exit(1)
+		}
+		run = mergeRuns(run, collected)
+	}
+	if strings.TrimSpace(*collectOutput) != "" {
+		if err := writeRun(*collectOutput, run); err != nil {
+			fmt.Fprintf(os.Stderr, "write collected events: %v\n", err)
+			os.Exit(2)
+		}
 	}
 	report := Evaluate(run)
 	switch *format {
@@ -117,6 +172,29 @@ func main() {
 	if !report.Passed {
 		os.Exit(1)
 	}
+}
+
+func mergeRuns(base, next DrillRun) DrillRun {
+	if base.Scenario == "" {
+		base.Scenario = next.Scenario
+	}
+	if base.Scenario == "" {
+		base.Scenario = scenarioHandoff001
+	}
+	if base.RunID == "" {
+		base.RunID = next.RunID
+	}
+	base.Events = append(base.Events, next.Events...)
+	return base
+}
+
+func writeRun(path string, run DrillRun) error {
+	body, err := json.MarshalIndent(run, "", "  ")
+	if err != nil {
+		return err
+	}
+	body = append(body, '\n')
+	return os.WriteFile(path, body, 0o644)
 }
 
 func readInput(path string) ([]byte, error) {
