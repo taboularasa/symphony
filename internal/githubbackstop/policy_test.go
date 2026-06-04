@@ -30,6 +30,16 @@ func TestDecodePolicyAcceptsRepositoryPolicy(t *testing.T) {
 	if got := strings.Join(denovo.AllowedRepositories, ","); got != "taboularasa/de-novo" {
 		t.Fatalf("denovo repositories = %s", got)
 	}
+	human, ok := policy.OwnerForLabel("owner:human")
+	if !ok {
+		t.Fatal("OwnerForLabel(owner:human) not found")
+	}
+	if got := strings.Join(human.AllowedRepositories, ","); got != "taboularasa/symphony" {
+		t.Fatalf("human repositories = %s", got)
+	}
+	if len(human.ExpectedApps) != 0 {
+		t.Fatalf("human expected apps = %#v, want none", human.ExpectedApps)
+	}
 }
 
 func TestDecodePolicyRejectsInvalidPolicy(t *testing.T) {
@@ -97,6 +107,16 @@ owners:
         login: hermes-bot[bot]
 `,
 			want: "app_id or app_id_env must be set",
+		},
+		{
+			name: "missing app for automation owner",
+			yaml: `schema_version: hadto.symphony.github-owner-backstop.v1
+owners:
+  - owner_label: owner:hermes
+    allowed_repositories: [taboularasa/hermes-agent]
+    expected_apps: []
+`,
+			want: "expected_apps must not be empty",
 		},
 		{
 			name: "invalid app id",
