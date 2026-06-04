@@ -13,6 +13,18 @@ LINEAR_WEBHOOK_SECRET=dev-secret go run ./tools/agent-watcher \
   --listen 127.0.0.1:18080
 ```
 
+By default, alerts are emitted as JSON to stdout for deterministic local runs
+and logs. Add live sinks explicitly:
+
+```sh
+LINEAR_WEBHOOK_SECRET=... SLACK_BOT_TOKEN=... WATCHER_LINEAR_TOKEN=... \
+  go run ./tools/agent-watcher \
+    --config tools/agent-watcher/watcher.example.yaml \
+    --listen 127.0.0.1:18080 \
+    --slack-token-env SLACK_BOT_TOKEN \
+    --linear-comment-token-env WATCHER_LINEAR_TOKEN
+```
+
 The webhook endpoint is:
 
 ```text
@@ -122,7 +134,7 @@ Description=Symphony Agent Watcher
 [Service]
 WorkingDirectory=/home/david/stacks/symphony
 EnvironmentFile=%h/.config/symphony/agent-watcher.env
-ExecStart=/usr/local/go/bin/go run ./tools/agent-watcher --config tools/agent-watcher/watcher.example.yaml --listen 127.0.0.1:18080 --dedupe-file %h/.local/state/symphony/agent-watcher-dedupe.json
+ExecStart=/usr/local/go/bin/go run ./tools/agent-watcher --config tools/agent-watcher/watcher.example.yaml --listen 127.0.0.1:18080 --dedupe-file %h/.local/state/symphony/agent-watcher-dedupe.json --slack-token-env SLACK_BOT_TOKEN --linear-comment-token-env WATCHER_LINEAR_TOKEN
 Restart=always
 RestartSec=5
 
