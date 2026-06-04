@@ -243,6 +243,19 @@ func TestCandidateIssueNormalizationRecordsAssigneeState(t *testing.T) {
 	if !self.AssignedTo("user-self") {
 		t.Fatalf("self assignment not detected: %+v", self.Assignee)
 	}
+
+	delegateNode := candidateNodeWithDelegate("HAD-4", &IssueUser{
+		ID:    " user-hermes ",
+		Name:  " Hermes ",
+		Email: " hermes@oauthapp.linear.app ",
+	}, "owner:hermes")
+	delegated, err := delegateNode.toCandidateIssue("owner:hermes")
+	if err != nil {
+		t.Fatalf("normalize delegate: %v", err)
+	}
+	if delegated.Delegate == nil || delegated.Delegate.ID != "user-hermes" || delegated.Delegate.Name != "Hermes" || delegated.Delegate.Email != "hermes@oauthapp.linear.app" {
+		t.Fatalf("delegate = %+v", delegated.Delegate)
+	}
 }
 
 func TestCandidateIssueNormalizationRejectsMalformedPayloads(t *testing.T) {
@@ -284,8 +297,8 @@ func TestCandidateIssueNormalizationAllowsMissingOptionalFields(t *testing.T) {
 	if issue.URL != "" || issue.Project.Name != "" || issue.State.Name != "" {
 		t.Fatalf("optional fields = url:%q project:%+v state:%+v", issue.URL, issue.Project, issue.State)
 	}
-	if issue.Assignee != nil || len(issue.Labels) != 0 || issue.Owner.ConflictReason != "" {
-		t.Fatalf("optional normalized fields = assignee:%+v labels:%+v owner:%+v", issue.Assignee, issue.Labels, issue.Owner)
+	if issue.Assignee != nil || issue.Delegate != nil || len(issue.Labels) != 0 || issue.Owner.ConflictReason != "" {
+		t.Fatalf("optional normalized fields = assignee:%+v delegate:%+v labels:%+v owner:%+v", issue.Assignee, issue.Delegate, issue.Labels, issue.Owner)
 	}
 }
 
@@ -462,6 +475,12 @@ func candidateNode(identifier string, labels ...string) candidateIssueNode {
 func candidateNodeWithAssignee(identifier string, assignee *IssueUser, labels ...string) candidateIssueNode {
 	node := candidateNode(identifier, labels...)
 	node.Assignee = assignee
+	return node
+}
+
+func candidateNodeWithDelegate(identifier string, delegate *IssueUser, labels ...string) candidateIssueNode {
+	node := candidateNode(identifier, labels...)
+	node.Delegate = delegate
 	return node
 }
 

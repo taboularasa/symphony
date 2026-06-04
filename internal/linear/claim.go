@@ -16,6 +16,7 @@ type IssueClaimer struct {
 type ClaimOptions struct {
 	SelfUserID   string
 	AgentUserIDs []string
+	Target       string
 }
 
 type ClaimOutcomeCode string
@@ -63,9 +64,9 @@ func (c IssueClaimer) ClaimIssue(ctx context.Context, issue CandidateIssue, opti
 	if outcome.Identifier == "" {
 		outcome.Identifier = current.Identifier
 	}
-	if current.Assignee != nil && current.Assignee.ID != selfUserID {
+	if targetUser := claimTargetUser(current, options); targetUser != nil {
 		outcome.ConfirmedIssue = &current
-		return classifyClaimOutcome(outcome, current.Assignee, options), nil
+		return classifyClaimOutcome(outcome, targetUser, options), nil
 	}
 
 	if err := c.assignIssue(ctx, issueID, selfUserID); err != nil {
@@ -79,7 +80,7 @@ func (c IssueClaimer) ClaimIssue(ctx context.Context, issue CandidateIssue, opti
 		outcome.Identifier = confirmed.Identifier
 	}
 	outcome.ConfirmedIssue = &confirmed
-	return classifyClaimOutcome(outcome, confirmed.Assignee, options), nil
+	return classifyClaimOutcome(outcome, claimTargetUser(confirmed, options), options), nil
 }
 
 func (c IssueClaimer) observeClaim(outcome ClaimOutcome) {
@@ -216,6 +217,11 @@ query SymphonyLinearConfirmClaim($issueId: String!, $relationFirst: Int!) {
       name
       email
     }
+    delegate {
+      id
+      name
+      email
+    }
     labels(first: $relationFirst, includeArchived: false) {
       nodes {
         id
@@ -224,3 +230,10 @@ query SymphonyLinearConfirmClaim($issueId: String!, $relationFirst: Int!) {
     }
   }
 }`
+
+func claimTargetUser(issue CandidateIssue, options ClaimOptions) *IssueUser {
+	if strings.EqualFold(strings.TrimSpace(options.Target), "delegate") {
+		return issue.Delegate
+	}
+	return issue.Assignee
+}

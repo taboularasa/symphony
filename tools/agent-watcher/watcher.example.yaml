@@ -6,8 +6,8 @@ forbidden_for:
 
 actors:
   - key: "hermes"
-    linear_user_ids: ["replace-with-hermes-linear-user-id"]
-    emails: ["hermes-bot@hadto.net"]
+    linear_user_ids: ["5ff8148f-ef73-46d2-8bef-398bf16d3f2c"]
+    emails: ["3da1d90f-3c91-4637-881d-616ab1224193@oauthapp.linear.app"]
   - key: "denovo"
     linear_user_ids: ["replace-with-denovo-linear-user-id"]
     emails: ["denovo-bot@hadto.net"]

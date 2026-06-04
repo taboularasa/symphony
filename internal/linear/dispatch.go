@@ -99,11 +99,12 @@ func EvaluateRestartRecovery(issue CandidateIssue, policy DispatchPolicy) Dispat
 		return decision
 	}
 	if policy.RequireClaimBeforeDispatch {
-		if issue.Assignee == nil || strings.TrimSpace(issue.Assignee.ID) == "" {
+		claimedUser := claimTargetUser(issue, policy.Claim)
+		if claimedUser == nil || strings.TrimSpace(claimedUser.ID) == "" {
 			return blockDispatch(issue, DispatchDecisionClaimCleared)
 		}
-		if issue.Assignee.ID != strings.TrimSpace(policy.Claim.SelfUserID) {
-			return blockDispatch(issue, dispatchCodeFromAssignee(issue.Assignee, policy.Claim))
+		if claimedUser.ID != strings.TrimSpace(policy.Claim.SelfUserID) {
+			return blockDispatch(issue, dispatchCodeFromAssignee(claimedUser, policy.Claim))
 		}
 	}
 	return allowDispatch(issue, nil)
