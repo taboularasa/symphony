@@ -18,13 +18,13 @@ func TestHermesWorkflowFileContract(t *testing.T) {
 		t.Fatalf("load Hermes workflow: %v", err)
 	}
 	tracker := def.Settings.Tracker
-	if err := tracker.ValidateOwnerClaimContract("owner:hermes", "hermes-bot", true); err != nil {
+	if err := tracker.ValidateOwnerClaimContract("owner:hermes", "hermes", true); err != nil {
 		t.Fatalf("Hermes owner/claim contract: %v", err)
 	}
 
 	config, err := tracker.ResolveLinearConfig(context.Background(), ClaimAssigneeResolverFunc(func(ctx context.Context, ref string) (ClaimAssigneeIdentity, error) {
-		if ref != "hermes-bot" {
-			t.Fatalf("claim ref = %q, want hermes-bot", ref)
+		if ref != "hermes" {
+			t.Fatalf("claim ref = %q, want hermes", ref)
 		}
 		return ClaimAssigneeIdentity{ID: "linear-user-hermes", Active: true}, nil
 	}))
@@ -34,8 +34,8 @@ func TestHermesWorkflowFileContract(t *testing.T) {
 	if config.APIKey != "test-hermes-token" {
 		t.Fatalf("api key was not resolved through HERMES_LINEAR_TOKEN")
 	}
-	if config.ProjectSlug != "shared-agents" {
-		t.Fatalf("project slug = %q, want shared-agents", config.ProjectSlug)
+	if config.ProjectSlug != "6a6a965c3d10" {
+		t.Fatalf("project slug = %q, want 6a6a965c3d10", config.ProjectSlug)
 	}
 	if got, want := strings.Join(config.ActiveStates, ","), "Todo,In Progress"; got != want {
 		t.Fatalf("active states = %q, want %q", got, want)
@@ -101,7 +101,7 @@ func TestHermesWorkflowFileContract(t *testing.T) {
 	for _, required := range []string{
 		"Hermes Execution Manager",
 		"owner:hermes",
-		"hermes-bot",
+		"hermes",
 		"ctx-managed worktree",
 		"Do not create a nested Hermes worktree",
 		"native Slack Socket Mode",
@@ -177,8 +177,8 @@ func TestHermesWorkflowRejectsMissingOwnerClaimContract(t *testing.T) {
 tracker:
   kind: linear
   api_key: "$HERMES_LINEAR_TOKEN"
-  project_slug: shared-agents
-  claim_assignee: hermes-bot
+  project_slug: 6a6a965c3d10
+  claim_assignee: hermes
   require_claim_before_dispatch: true
 ---
 Prompt
@@ -191,13 +191,13 @@ Prompt
 tracker:
   kind: linear
   api_key: "$HERMES_LINEAR_TOKEN"
-  project_slug: shared-agents
+  project_slug: 6a6a965c3d10
   owner_label: owner:hermes
   require_claim_before_dispatch: false
 ---
 Prompt
 `,
-			want: `tracker.claim_assignee must be "hermes-bot"`,
+			want: `tracker.claim_assignee must be "hermes"`,
 		},
 		{
 			name: "claim gate disabled",
@@ -205,9 +205,9 @@ Prompt
 tracker:
   kind: linear
   api_key: "$HERMES_LINEAR_TOKEN"
-  project_slug: shared-agents
+  project_slug: 6a6a965c3d10
   owner_label: owner:hermes
-  claim_assignee: hermes-bot
+  claim_assignee: hermes
   require_claim_before_dispatch: false
 ---
 Prompt
@@ -221,7 +221,7 @@ Prompt
 			if err != nil {
 				t.Fatalf("parse malformed Hermes fixture: %v", err)
 			}
-			err = def.Settings.Tracker.ValidateOwnerClaimContract("owner:hermes", "hermes-bot", true)
+			err = def.Settings.Tracker.ValidateOwnerClaimContract("owner:hermes", "hermes", true)
 			if err == nil {
 				t.Fatal("expected contract validation error")
 			}
@@ -293,10 +293,10 @@ func requireBool(t *testing.T, values map[string]any, key string) bool {
 func ExampleTrackerConfig_ValidateOwnerClaimContract() {
 	settings, _ := DecodeSettings([]byte(`tracker:
   owner_label: owner:hermes
-  claim_assignee: hermes-bot
+  claim_assignee: hermes
   require_claim_before_dispatch: true
 `))
-	err := settings.Tracker.ValidateOwnerClaimContract("owner:hermes", "hermes-bot", true)
+	err := settings.Tracker.ValidateOwnerClaimContract("owner:hermes", "hermes", true)
 	fmt.Println(err == nil)
 	// Output: true
 }

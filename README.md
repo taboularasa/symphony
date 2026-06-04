@@ -42,9 +42,9 @@ tracker:
   kind: linear
   endpoint: https://api.linear.app/graphql
   api_key: "$HERMES_LINEAR_TOKEN"
-  project_slug: symphony
+  project_slug: 6a6a965c3d10
   owner_label: "owner:hermes"
-  claim_assignee: "hermes-bot"
+  claim_assignee: "hermes"
   require_claim_before_dispatch: true
   active_states: ["Todo", "In Progress"]
   terminal_states: ["Done", "Canceled", "Cancelled", "Duplicate"]
@@ -55,11 +55,13 @@ Omitting `owner_label`, `claim_assignee`, and
 active-state filtering only, no owner-label filter, no Linear assignee mutation,
 and no claim gate.
 
-When `owner_label` is set, candidate discovery adds the owner label to the same
-Linear GraphQL filter object as project slug and active states, then defensively
-post-filters returned issues. Issues missing the configured owner label, carrying
-a different `owner:*` label, or carrying conflicting owner labels are not
-dispatchable for that owner.
+`project_slug` maps to Linear `Project.slugId`, which is the URL suffix such as
+`6a6a965c3d10`, not the human-readable project name. When `owner_label` is set,
+candidate discovery adds the owner label to the same Linear GraphQL filter
+object as project slugId and active states, then defensively post-filters
+returned issues. Issues missing the configured owner label, carrying a different
+`owner:*` label, or carrying conflicting owner labels are not dispatchable for
+that owner.
 
 When `require_claim_before_dispatch: true`, `claim_assignee` must resolve to one
 active Linear user. The resolver supports `me`, a Linear UUID, email, `name`, or
@@ -107,7 +109,7 @@ in [`hermes/PROMPT_TRACE.md`](hermes/PROMPT_TRACE.md),
 
 Required operator environment:
 
-- `HERMES_LINEAR_TOKEN`: Linear token for the `hermes-bot` claim identity.
+- `HERMES_LINEAR_TOKEN`: Linear token for the active `hermes` claim identity.
 - `#agents-bridge` and bot membership from HAD-658 before live smoke tests.
 - Existing native Slack Socket Mode credentials stay with
   `hermes-gateway.service`; this workflow does not configure webhook/WASM
@@ -117,8 +119,9 @@ Required workflow fields:
 
 ```yaml
 tracker:
+  project_slug: 6a6a965c3d10
   owner_label: "owner:hermes"
-  claim_assignee: "hermes-bot"
+  claim_assignee: "hermes"
   require_claim_before_dispatch: true
 migration:
   legacy_loop_mode: disabled

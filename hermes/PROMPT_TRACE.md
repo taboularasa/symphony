@@ -24,7 +24,7 @@ policy from generic Hermes runtime prompt machinery.
 ## Migrated Guardrails
 
 - Hermes acts only on Symphony-returned Linear issues with `owner:hermes`.
-- Dispatch requires the `hermes-bot` claim gate to win or confirm self.
+- Dispatch requires the `hermes` Linear app-user claim gate to win or confirm self.
 - `owner:denovo`, `owner:human`, `owner:triage`, unlabeled issues, and
   conflicting owner labels are excluded by positive label selection, not
   project-name negative lists.
@@ -43,7 +43,7 @@ policy from generic Hermes runtime prompt machinery.
 `internal/workflow/hermes_test.go` loads the checked-in workflow file and
 asserts:
 
-- the tracker contract uses `owner:hermes`, `hermes-bot`, and
+- the tracker contract uses `owner:hermes`, `hermes`, and
   `require_claim_before_dispatch: true`;
 - `$HERMES_LINEAR_TOKEN` resolves by environment indirection in tests without
   embedding a real token;

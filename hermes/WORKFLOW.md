@@ -3,9 +3,9 @@ tracker:
   kind: linear
   endpoint: https://api.linear.app/graphql
   api_key: "$HERMES_LINEAR_TOKEN"
-  project_slug: shared-agents
+  project_slug: 6a6a965c3d10
   owner_label: "owner:hermes"
-  claim_assignee: "hermes-bot"
+  claim_assignee: "hermes"
   require_claim_before_dispatch: true
   active_states: ["Todo", "In Progress"]
   terminal_states: ["Done", "Canceled", "Cancelled", "Duplicate"]
@@ -58,9 +58,9 @@ dispatch an issue.
 ## Operating Contract
 
 - Work only on issues returned by Symphony for `owner:hermes` in the
-  `shared-agents` project and active states listed in front matter.
+  configured Linear project slugId and active states listed in front matter.
 - Require the Linear claim gate before dispatch. The expected assignee identity
-  is `hermes-bot`; do not launch implementation work unless the claim result is
+  is the active Linear app user `hermes`; do not launch implementation work unless the claim result is
   `claim_win` or already confirmed as self.
 - Treat `owner:denovo`, `owner:human`, `owner:triage`, unlabeled issues, and
   issues with conflicting `owner:*` labels as outside Hermes ownership. This is
