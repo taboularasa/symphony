@@ -23,6 +23,9 @@ func TestPollerUsesConservativePaginationAndUpdatedOrdering(t *testing.T) {
 	if !strings.Contains(client.query, "orderBy: updatedAt") {
 		t.Fatalf("query missing updated ordering:\n%s", client.query)
 	}
+	if !strings.Contains(client.query, "$since: DateTimeOrDuration!") {
+		t.Fatalf("query missing DateTimeOrDuration variable:\n%s", client.query)
+	}
 	if client.variables["first"] != 100 {
 		t.Fatalf("page size = %#v", client.variables["first"])
 	}
