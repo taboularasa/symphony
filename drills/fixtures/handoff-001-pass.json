@@ -1,0 +1,106 @@
+{
+  "scenario": "handoff-001",
+  "run_id": "handoff-001-fixture",
+  "events": [
+    {
+      "ts": "2026-06-04T15:00:00Z",
+      "source": "linear",
+      "kind": "intake_created",
+      "actor": "human",
+      "linear_id": "HAD-2000",
+      "owner_label": "owner:human"
+    },
+    {
+      "ts": "2026-06-04T15:01:00Z",
+      "source": "linear",
+      "kind": "owner_label_set",
+      "actor": "human",
+      "linear_id": "HAD-2000",
+      "owner_label": "owner:hermes"
+    },
+    {
+      "ts": "2026-06-04T15:03:00Z",
+      "source": "linear",
+      "kind": "child_created",
+      "actor": "hermes",
+      "linear_id": "HAD-2001",
+      "parent_linear_id": "HAD-2000",
+      "owner_label": "owner:denovo"
+    },
+    {
+      "ts": "2026-06-04T15:04:00Z",
+      "source": "slack",
+      "kind": "handoff",
+      "actor": "hermes",
+      "linear_id": "HAD-2001",
+      "channel": "#agents-bridge",
+      "metadata_event_type": "agents_bridge_v1"
+    },
+    {
+      "ts": "2026-06-04T15:05:00Z",
+      "source": "hermes_log",
+      "kind": "adversarial_refusal",
+      "actor": "hermes",
+      "linear_id": "HAD-2001",
+      "owner_label": "owner:denovo",
+      "outcome": "dispatch_denied"
+    },
+    {
+      "ts": "2026-06-04T15:06:00Z",
+      "source": "linear",
+      "kind": "claim_win",
+      "actor": "denovo",
+      "linear_id": "HAD-2001",
+      "owner_label": "owner:denovo",
+      "outcome": "claimed"
+    },
+    {
+      "ts": "2026-06-04T15:07:00Z",
+      "source": "slack",
+      "kind": "ack",
+      "actor": "denovo",
+      "linear_id": "HAD-2001",
+      "channel": "#agents-bridge",
+      "metadata_event_type": "agents_bridge_v1"
+    },
+    {
+      "ts": "2026-06-04T15:10:00Z",
+      "source": "github",
+      "kind": "pr_opened",
+      "actor": "denovo",
+      "linear_id": "HAD-2001",
+      "github_pr": "https://github.com/taboularasa/de-novo/pull/200"
+    },
+    {
+      "ts": "2026-06-04T15:11:00Z",
+      "source": "slack",
+      "kind": "release",
+      "actor": "denovo",
+      "linear_id": "HAD-2001",
+      "channel": "#agents-bridge",
+      "metadata_event_type": "agents_bridge_v1",
+      "github_pr": "https://github.com/taboularasa/de-novo/pull/200"
+    },
+    {
+      "ts": "2026-06-04T15:20:00Z",
+      "source": "github",
+      "kind": "pr_merged",
+      "actor": "human",
+      "linear_id": "HAD-2001",
+      "github_pr": "https://github.com/taboularasa/de-novo/pull/200"
+    },
+    {
+      "ts": "2026-06-04T15:25:00Z",
+      "source": "linear",
+      "kind": "parent_closed",
+      "actor": "hermes",
+      "linear_id": "HAD-2000"
+    },
+    {
+      "ts": "2026-06-04T15:30:00Z",
+      "source": "watcher",
+      "kind": "soak_clean",
+      "alert_count": 0
+    }
+  ]
+}
