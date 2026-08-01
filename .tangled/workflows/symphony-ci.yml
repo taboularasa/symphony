@@ -1,0 +1,27 @@
+# symphony-ci: build and test the canonical tree in an egress-free Spindle guest
+# (HAD-2389).
+#
+# Thin adapter, matching the de-novo and buf-mechsuit convention: what this lane
+# RUNS is decided by scripts/ci/symphony-acceptance.sh; this file says only when
+# to run it and on which image.
+when:
+  - event: ["push"]
+    branch: ["**"]
+engine: microvm
+image: nixos
+# The lane reads only the checked-out tree — no merge base is computed and no
+# base ref is fetched — so the default shallow clone is sufficient.
+clone:
+  depth: 1
+# No `dependencies:` block. Go is baked into the guest image by tangled-infra
+# carried patch 0003, and this module's single third-party dependency is
+# vendored in-tree, so the lane resolves nothing at run time. A dependency entry
+# would resolve against cache.nixos.org, which an egress-free guest cannot
+# reach; nix then falls back to building from source and the lane never starts.
+steps:
+  - name: symphony-ci
+    command: |
+      set -euo pipefail
+      cd /workspace/repo
+      git config --global --add safe.directory /workspace/repo || true
+      bash scripts/ci/symphony-acceptance.sh

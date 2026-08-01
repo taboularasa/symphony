@@ -1,0 +1,17 @@
+# Reviewed CI acceptance policy for symphony (HAD-2389).
+#
+# This file is the COMPLETE set of lanes a change to this repository must pass
+# before it can be merged. It is owned by the repository, not by whoever runs
+# the merge: `cmd/tangled-change` reads it from the git tree at the reviewed
+# revision and has no flag that can add to, narrow, or replace it. The Tangled
+# workflow YAML is an adapter that runs a lane; it cannot decide whether the
+# lane counts.
+#
+# Lane names are the workflow filenames exactly as Spindle reports them. They
+# are compared to pipeline results by string equality, so a bare stem here
+# matches nothing and every lane silently reads as ungoverned.
+version: 1
+repo: symphony
+
+required_workflows:
+  - symphony-ci.yml
