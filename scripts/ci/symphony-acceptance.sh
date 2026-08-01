@@ -8,6 +8,7 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
 expected_attestation_schema=1
+expected_vendor_sha256="850f0b5eb4d0142f22464c66855a645723156496eb92c3c583e011218d4679bb"
 policy=".tangled/ci-policy.yaml"
 workflow=".tangled/workflows/symphony-ci.yml"
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -60,9 +61,22 @@ run_required() {
   printf 'EVIDENCE command=%s result=pass duration_seconds=%s\n' "$name" "$(( $(date +%s) - start ))"
 }
 
-# `go mod verify` proves the vendored tree matches the module hashes the go.sum
-# records, so a hand-edited vendor directory is refused rather than trusted.
-run_required mod-verify go mod verify
+# NOT `go mod verify`: that checks the module CACHE against go.sum, and vendor
+# mode never populates the cache, so it tries a module lookup and fails closed
+# against GOPROXY=off. The vendored tree is pinned by digest instead, which is
+# both network-free and stronger -- it is a reviewed literal, so any edit to the
+# vendored source changes it, not merely a checksum the same commit could
+# restate. Go's own vendor consistency check still runs on every build below,
+# refusing a vendor/modules.txt that disagrees with go.mod.
+#
+# Contents, mode-normalized: the same tar form used elsewhere in this project,
+# so the digest does not move with directory names or file modes.
+observed_vendor="$(
+  tar -C vendor --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+    --mode='u=rw,go=r,a+X' -cf - . | sha256sum | cut -d' ' -f1
+)"
+[ "$observed_vendor" = "$expected_vendor_sha256" ] ||
+  fail "vendored dependency tree does not match the reviewed lock ($observed_vendor)"
 run_required vet go vet ./...
 run_required build go build ./...
 run_required tests go test ./...
@@ -70,7 +84,7 @@ run_required tests go test ./...
 source_sha="$(git rev-parse --verify HEAD^{commit})"
 policy_sha="$(sha256sum "$policy" | cut -d' ' -f1)"
 workflow_sha="$(sha256sum "$workflow" | cut -d' ' -f1)"
-vendor_sha="$(sha256sum vendor/modules.txt | cut -d' ' -f1)"
+vendor_sha="$observed_vendor"
 finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 printf '%s\n' \
   "EVIDENCE schema=symphony.ci.v1 result=pass" \
